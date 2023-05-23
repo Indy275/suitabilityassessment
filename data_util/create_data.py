@@ -12,8 +12,6 @@ import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
-from util import geospatial
-
 import rasterio
 from rasterio import features, mask
 
@@ -24,16 +22,6 @@ config.read('config.ini')
 
 data_url = config['DEFAULT']['data_url']
 json_headers = json.loads(config['DEFAULT']['json_headers'])
-
-verbose = int(config['DATA_CREATION']['verbose'])
-
-
-# def get_bbox(bbox):
-#     if bbox == 'waterland':
-#         waterland = gpd.read_file(data_url + "/waterland.shp")
-#         bbox = [min(waterland.bounds.minx), min(waterland.bounds.miny), max(waterland.bounds.maxx),
-#                 max(waterland.bounds.maxy)]
-#     return bbox
 
 
 def get_point_data(raster_url, point):
@@ -48,11 +36,11 @@ def get_raster_data(raster_url, modifier, name, bbox, width, height):
     geotiff_name_msk = data_url + '/rasters/' + modifier + '/msk_' + name + '.tiff'
 
     if not Path(geotiff_name_msk).is_file():
-    # if True:
+        # if True:
         print("No masked .tiff-file found for layer {}; retrieving and extracting data".format(name))
         geotiff_name = data_url + '/rasters/' + modifier + '/' + name + '.tiff'
         if not Path(geotiff_name).is_file():
-        # if True:
+            # if True:
             bbox_str = ','.join(map(str, bbox))  # API requests a string-formatted list for some reason
             r = requests.get(url=raster_url + '/data/',
                              headers=json_headers,
@@ -94,12 +82,10 @@ def get_raster_data(raster_url, modifier, name, bbox, width, height):
     return np.squeeze(data)
 
 
-def get_labels(model, modifier, name, copy, fav_data=None, fav_name=None):
+def get_labels(model, modifier, name, copy, cluster=None):
     """
     Retrieve label data from .tiff
 
-    :param fav_data:
-    :param fav_name:
     :param model: str, 'expert_ref' or 'hist_buildings'
     :param name: name of the model, equal to model
     :param copy: layer data for feature burning
@@ -107,20 +93,34 @@ def get_labels(model, modifier, name, copy, fav_data=None, fav_name=None):
     """
     geotiff_name = data_url + '/rasters/' + modifier + '/' + name + '.tiff'
     if model == 'expert_ref':  # rough idea: take data points from favourite; geoms are used and value is assigned
-        assert fav_data is not None and fav_name is not None
+        assert cluster is not None
         if not Path(geotiff_name).is_file():
             print("No saved .tiff found for layer {}; retrieving data".format(name))
-            json_url = data_url + '/' + fav_name + '_points.json'
+            if cluster == 'OC':
+                dp_url = 'https://hhnk.lizard.net/api/v4/favourites/89c4db99-7a1a-4aa1-8abc-f89133d20d63/'
+            elif cluster == 'WS':
+                dp_url = 'https://hhnk.lizard.net/api/v4/favourites/917100d2-7e3f-430f-a9d5-1fb42f5bb7d0/'
+            else:
+                print("cluster should be one of [OC, WS]")
+                return
+            r = requests.get(url=dp_url, headers=json_headers)
+            data = r.json()['state']
+
+            json_url = data_url + '/datapoints_{}.json'.format(cluster)
             if not Path(json_url).is_file():
                 with open(json_url, 'w') as f:
-                    json.dump(fav_data['geometries'], f)
+                    json.dump(data['geometries'], f)
 
             with open(json_url, 'r') as f:
                 points = json.load(f)
 
-            with open(data_url + '/' + fav_name + '_pointscores.csv', 'r') as f:
-                scores = [int(t[0]) - 5 for t in csv.reader(f)]
-
+            scores = []
+            with open(data_url + '/expertscores_{}.csv'.format(cluster), 'r') as f:
+                csvreader = csv.reader(f)
+                next(csvreader)
+                for row in csvreader:
+                    scores.append(float(row[3]))  # Mean
+                    # scores.append(float(row[4]))  # Std
             gdf = gpd.GeoDataFrame.from_features(points, columns=['geometry', 'score'])
             gdf['value'] = np.array(scores).flatten()
             shapes = [(geom, int(value)) for geom, value in zip(gdf['geometry'], gdf['value'])]
@@ -163,10 +163,9 @@ def get_labels(model, modifier, name, copy, fav_data=None, fav_name=None):
     return np.squeeze(data)
 
 
-def get_fav_data(uuid, modifier, model, bbox, width, height):
+def get_fav_data(uuid, modifier, cluster, model, bbox, width, height):
     fav_url = "https://hhnk.lizard.net/api/v4/favourites/{}/".format(uuid)
     r = requests.get(url=fav_url, headers=json_headers)
-    fav_name = r.json()['name']
     data = r.json()['state']
 
     col_names, combined_sources = [], []
@@ -177,22 +176,18 @@ def get_fav_data(uuid, modifier, model, bbox, width, height):
         layerdata = np.array(get_raster_data(raster_url, modifier, layer['name'], bbox, width, height))
         combined_sources.append(layerdata)
 
-        if verbose:
-            plt.imshow(layerdata, cmap='viridis')
-            plt.show()
-
     label_data = np.array(
-        get_labels(model, modifier, name=model, copy=col_names[-2], fav_data=data, fav_name=fav_name))
+        get_labels(model, modifier, name=model, copy=col_names[-2], cluster=cluster))
     combined_sources.append(label_data)
     col_names.append(model.strip())
     return np.array(combined_sources), col_names
 
 
-def create_df(fav_uuid, modifier, bbox, width, height, model):
-    if not os.path.exists(data_url+'/'+modifier):
-        os.makedirs(data_url+'/'+modifier)
+def create_df(fav_uuid, modifier, cluster, bbox, width, height, model):
+    if not os.path.exists(data_url + '/' + modifier):
+        os.makedirs(data_url + '/' + modifier)
         os.makedirs(data_url + '/rasters/' + modifier)
-    extracted_data, col_names = get_fav_data(fav_uuid, modifier, model, bbox, width, height)
+    extracted_data, col_names = get_fav_data(fav_uuid, modifier, cluster, model, bbox, width, height)
 
     extracted_data[extracted_data < -9000] = np.nan
     data_extract2 = np.transpose(extracted_data, (1, 2, 0))

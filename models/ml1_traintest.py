@@ -28,18 +28,19 @@ def save_imp(imp, names, model, modifier):
 
 def train_predict(X_train, y_train, X_test, y_test, test_w, test_h, model, modifier, col_names, plot_fimp=0):
     n_feats = X_train.shape[-1]
-    train_nans = np.isnan(X_train)
     test_nans = np.isnan(X_test)
 
-    X_train = X_train[~train_nans]
-    y_train = y_train[~train_nans[:,0]]
+    train_vals = y_train != 0
+    test_vals = y_test != 0
+
     X_test = X_test[~test_nans]
-    y_test = y_test[~test_nans[:,0]]
+    X_train = X_train[train_vals]
+    y_train = y_train[train_vals]
     X_train = X_train.reshape((-1, n_feats))
     X_test = X_test.reshape((-1, n_feats))
 
-    y_preds = np.zeros(test_nans[:,0].shape)
-    y_preds[test_nans[:,0]] = np.nan
+    y_preds = np.zeros(y_test.shape)
+    y_preds[test_nans[:, 0]] = np.nan
 
     if model == 'gbr':
         reg = GradientBoostingRegressor()
@@ -66,16 +67,16 @@ def train_predict(X_train, y_train, X_test, y_test, test_w, test_h, model, modif
     else:
         print("Invalid model; should be one of ['gbr','svm']")
         y_pred = np.zeros((test_h * test_w))
-
-    mse = mean_squared_error(y_test, y_pred)
+    y_preds[~test_nans[:, 0]] = y_pred
+    mse = mean_squared_error(y_test[test_vals], y_preds[test_vals])
     print("Test MSE: {:.4f}".format(mse))
-    y_preds[~test_nans[:,0]] = y_pred
     pd.DataFrame(y_preds).to_csv(data_url + '/' + modifier + "/" + model + "_pred.csv")
     if plot_pred:
         plot.plot_prediction(y_preds, test_h)
         if model == 'svm':
             y_preds[~test_nans[:, 0]] = y_pred2
             plot.plot_prediction(y_preds, test_h)
+
 
 def run_model(train_mod, test_mod, model, train_w, train_h, test_w, test_h, ref_std):
 
