@@ -19,18 +19,29 @@ data = ahp_util.read_survey_data(numeric_data, datetime.date(2023, 5, 15))
 matrix = ahp_util.build_matrix(data)
 consistency_ratio = [ahp_util.compute_consistency_ratio(matrix[expert]) for expert in range(len(data))]
 priority_weights = [ahp_util.compute_priority_weights(matrix[expert]) for expert in range(len(data))]
+print("weights per expert:", priority_weights)
+
+location_gm = ahp_util.compute_priority_weights_aggregate(matrix)
+print("Geometric mean: ", location_gm)
 
 cr = ahp_util.compute_consistency_ratio(matrix.mean(axis=0))
-location_mean = ahp_util.compute_priority_weights(matrix.mean(axis=0))
-print(location_mean, cr)
+location_am = ahp_util.compute_priority_weights(matrix.mean(axis=0))
+print("Arithmetic mean: ", location_am, cr)
 
 cr = ahp_util.compute_consistency_ratio(matrix.std(axis=0))
 location_std = ahp_util.compute_priority_weights(matrix.std(axis=0))
-print(location_std, cr)
+print("Standard deviation:", location_std, cr)
 
 dp, X, Y = ahp_util.read_dp_csv(cluster)
 
-with open(data_url + "/expert_values_{}.csv".format(cluster), 'w') as f:
+with open(data_url + "/expertscores_{}.csv".format(cluster), 'w') as f:
     f.write("Point,X,Y,Mean,Std\n")
-    for p, x, y, mean, std in zip(dp, X, Y, location_mean, location_std):
-        f.write("%s,%s,%s,%s,%s\n" % (p, x, y, mean, std))
+    for p, x, y, mean, std in zip(dp, X, Y, location_gm, location_std):
+        f.write("%s,%s,%s,%s,%s\n" % (p, x, y, mean, std[0]))
+
+# for i in range(len(data)):
+#     priority_weights = ahp_util.compute_priority_weights(matrix[i])
+#     with open(data_url + "/expertscores_{}{}.csv".format(cluster, i), 'w') as f:
+#         f.write("Point,X,Y,val\n")
+#         for p, x, y, mean, std in zip(dp, X, Y, priority_weights, location_std):
+#             f.write("%s,%s,%s,%s\n" % (p, x, y, mean[0]))

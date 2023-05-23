@@ -4,11 +4,17 @@ import pandas as pd
 import numpy as np
 import configparser
 import os
+from sklearn.preprocessing import MinMaxScaler
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
+
+
+def geo_mean(iterable):
+    a = np.array(iterable)
+    return a.prod() ** (1.0 / len(a))
 
 
 def build_matrix(data):
@@ -52,18 +58,22 @@ def compute_consistency_ratio(matrix):
     random_index = ri_dict[n]
     consistency_ratio = consistency_index / random_index
 
-
     return consistency_ratio
 
 
 def compute_priority_weights(matrix):
     eigenvalues, eigenvectors = np.linalg.eig(matrix)
     max_eigenvalue_index = np.argmax(eigenvalues)
-
     priority_vector = np.real(eigenvectors[:, max_eigenvalue_index])
+    scaler = MinMaxScaler(feature_range=(-10, 10))
+    priority_weights = scaler.fit_transform(priority_vector.reshape(-1, 1))
+    return list(priority_weights)
 
-    # Normalize the priority vector
-    priority_weights = priority_vector / np.sum(priority_vector) * 10
+
+def compute_priority_weights_aggregate(matrix):
+    geomatrix = [geo_mean(matrix[:, i, j]) for i in range(matrix.shape[1]) for j in range(matrix.shape[2])]
+    geomatrix = np.reshape(geomatrix, (matrix.shape[1], matrix.shape[2]))
+    priority_weights = np.mean(geomatrix / np.sum(geomatrix, axis=0), axis=1)
     return list(priority_weights)
 
 
@@ -78,4 +88,3 @@ def read_survey_data(name, date):
     df = df[pd.to_datetime(df['EndDate']) > pd.to_datetime(date)]
     df.columns = [c.replace(' ', '_') for c in df.columns]
     return df
-
