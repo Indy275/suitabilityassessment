@@ -66,7 +66,7 @@ def train_predict(X_train, y_train, X_test, y_test, test_w, test_h, model, modif
             save_imp(svm.coef_[0], col_names[:-1], model, modifier)
     else:
         print("Invalid model; should be one of ['gbr','svm']")
-        y_pred = np.zeros((test_h * test_w))
+        y_pred = np.repeat(0, y_preds[~test_nans[:, 0]].shape)
     y_preds[~test_nans[:, 0]] = y_pred
     mse = mean_squared_error(y_test[test_vals], y_preds[test_vals])
     print("Test MSE: {:.4f}".format(mse))

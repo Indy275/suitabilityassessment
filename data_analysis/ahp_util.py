@@ -5,6 +5,7 @@ import numpy as np
 import configparser
 import os
 from sklearn.preprocessing import MinMaxScaler
+from functools import reduce
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
@@ -65,8 +66,12 @@ def compute_priority_weights(matrix):
     eigenvalues, eigenvectors = np.linalg.eig(matrix)
     max_eigenvalue_index = np.argmax(eigenvalues)
     priority_vector = np.real(eigenvectors[:, max_eigenvalue_index])
-    scaler = MinMaxScaler(feature_range=(-10, 10))
-    priority_weights = scaler.fit_transform(priority_vector.reshape(-1, 1))
+    # scaler = MinMaxScaler(feature_range=(-10, 10))
+    # priority_weights = scaler.fit_transform(priority_vector.reshape(-1, 1))
+    priority_weights = np.zeros(matrix.shape[1])
+    for i in range(0, matrix.shape[1]):
+        priority_weights[i] = reduce((lambda x, y: x * y), matrix[i, :]) ** (1 / matrix.shape[1])
+    priority_weights = priority_weights / np.sum(priority_weights)
     return list(priority_weights)
 
 
@@ -87,4 +92,5 @@ def read_survey_data(name, date):
     df = df.iloc[2:]
     df = df[pd.to_datetime(df['EndDate']) > pd.to_datetime(date)]
     df.columns = [c.replace(' ', '_') for c in df.columns]
+    df.columns = [c.replace('.', '_') for c in df.columns]
     return df

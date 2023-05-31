@@ -123,7 +123,8 @@ def get_labels(model, modifier, name, copy, cluster=None):
                     # scores.append(float(row[4]))  # Std
             gdf = gpd.GeoDataFrame.from_features(points, columns=['geometry', 'score'])
             gdf['value'] = np.array(scores).flatten()
-            shapes = [(geom, int(value)) for geom, value in zip(gdf['geometry'], gdf['value'])]
+            # shapes = [(geom, int(value)) for geom, value in zip(gdf['geometry'], gdf['value'])]
+            shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['value'])]
 
             copy_fn = data_url + '/rasters/' + modifier + '/' + copy + '.tiff'
             copy_f = rasterio.open(copy_fn)

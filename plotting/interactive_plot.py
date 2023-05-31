@@ -23,8 +23,12 @@ class DashApp():
     def __init__(self, modifier, w, h, w_model=None):
         self.app = Dash(__name__)
         if w_model:
-            weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
-            weights_init = weights_init['importance']
+            if w_model == 'expert':
+                weights_init = pd.read_csv(data_url + "/factorweights_OC.csv")
+                weights_init = weights_init['Mean']
+            else:
+                weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
+                weights_init = weights_init['importance']
         else:
             weights_init = np.repeat([1], 5)
         unweighted_df, df_orig, col_names = load_data.load_xy(modifier)
@@ -40,31 +44,31 @@ class DashApp():
         self.app.layout = html.Div([
             dcc.Graph(id='graph-with-slider'),
             dcc.Markdown(col_names[0]),
-            dcc.Slider(0, 10, 1,
+            dcc.Slider(0, 5, 1,
                        value=weights_init[0],
                        tooltip=dict(always_visible=True, placement='bottom'),
                        id='slider1'
                        ),
             dcc.Markdown(col_names[1]),
-            dcc.Slider(0, 10, 1,
+            dcc.Slider(0, 5, 1,
                        value=weights_init[1],
                        tooltip=dict(always_visible=True, placement='bottom'),
                        id='slider2'
                        ),
             dcc.Markdown(col_names[2]),
-            dcc.Slider(0, 10, 1,
+            dcc.Slider(0, 5, 1,
                        value=weights_init[2],
                        tooltip=dict(always_visible=True, placement='bottom'),
                        id='slider3'
                        ),
             dcc.Markdown(col_names[3]),
-            dcc.Slider(0, 10, 1,
+            dcc.Slider(0, 5, 1,
                        value=weights_init[3],
                        tooltip=dict(always_visible=True, placement='bottom'),
                        id='slider4'
                        ),
             dcc.Markdown(col_names[4]),
-            dcc.Slider(0, 10, 1,
+            dcc.Slider(0, 5, 1,
                        value=weights_init[4],
                        tooltip=dict(always_visible=True, placement='bottom'),
                        id='slider5'

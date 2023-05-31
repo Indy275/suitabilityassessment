@@ -119,7 +119,7 @@ def get_pointinfo(dp_uuid, cluster):
     df.to_csv(data_url + "/point_info_{}.csv".format(cluster), index=False)
 
 
-cluster = 'WS'
+cluster = 'OC'
 dp_uuid = "917100d2-7e3f-430f-a9d5-1fb42f5bb7d0"  # WS;  Get the data points from here
 # "89c4db99-7a1a-4aa1-8abc-f89133d20d63"  # OC
 
@@ -131,7 +131,10 @@ dp_uuid = "917100d2-7e3f-430f-a9d5-1fb42f5bb7d0"  # WS;  Get the data points fro
 # total_df = pd.concat([df, dpxy], axis=1)
 # total_df.to_csv(data_url+"/expert_point_info_{}.csv".format(cluster))
 
-total_df = pd.read_csv(data_url + "/expert_point_info_{}.csv".format(cluster))
+total_df = pd.read_csv(data_url + "/expert_points_{}.csv".format(cluster))
+print([round(min(total_df['X']), 4) - 0.01, round(min(total_df['Y']), 4) - 0.01, round(max(total_df['X']), 4) + 0.01,
+       round(max(total_df['Y']), 4) + 0.01])
+
 
 # df.hist()
 # plt.show()
@@ -143,8 +146,6 @@ total_df = pd.read_csv(data_url + "/expert_point_info_{}.csv".format(cluster))
 # flat_list = [item for sublist in taken_ids for item in sublist]
 # taken = list(set(flat_list))
 # print(len(total_df),'ids in list, taken:',len(taken))
-
-samples = np.repeat(range(len(total_df)), 2)
 
 
 def shuff(samples):
@@ -160,8 +161,10 @@ def shuff(samples):
     return samples_list
 
 
-sample_ids = shuff(samples)
-block_samples = []
-for block in sample_ids:
-    block_samples.append(list(np.sort(block)))
-print(block_samples)
+def block_samples():
+    samples = np.repeat(range(len(total_df)), 2)
+    sample_ids = shuff(samples)
+    block_samples = []
+    for block in sample_ids:
+        block_samples.append(list(np.sort(block)))
+    print(block_samples)

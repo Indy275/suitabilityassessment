@@ -1,4 +1,5 @@
 import os
+import csv
 from joblib import load
 import configparser
 from pathlib import Path
@@ -56,3 +57,15 @@ def load_bg(modifier):
         bg = np.zeros((10, 10))
         bg += 1e-4
     return bg
+
+
+def load_expert(modifier):
+    X1, X2, scores = [], [], []
+    with open(data_url + '/expertscores_{}.csv'.format(modifier), 'r') as f:
+        csvreader = csv.reader(f)
+        next(csvreader)
+        for row in csvreader:
+            X1.append(float(row[1]))  # Mean
+            X2.append(float(row[2]))  # Mean
+            scores.append(float(row[3]))  # Mean
+    return np.array([X1, X2]), np.array(scores)
