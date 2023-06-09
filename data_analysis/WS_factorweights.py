@@ -6,6 +6,7 @@ from data_analysis import ahp_util
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from textwrap import wrap
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
@@ -13,7 +14,7 @@ config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
 
 choice_data = 'Bodem en Watersturend WS v2_May 30, 2023_11.23'
-numeric_data = 'Bodem en Watersturend WS v2_May 30, 2023_11.15'
+numeric_data = 'Bodem en Watersturend WS v2_June 9, 2023_09.44'
 cluster = 'WS'
 
 df = ahp_util.read_survey_data(choice_data, datetime.date(2023, 5, 23))
@@ -28,33 +29,45 @@ for col in ['Q2_5', 'Q2_4', 'Q2_3', 'Q2_2', 'Q2_1']:
     print("df", df[col])
     data[col] = np.where(data[col] == 1, 0, data[col])
     data[col] = np.where(data[col] == 6, 1, data[col])  # Qualtrics error: 'Een beetje belangrijk' is seen as 6
-    # for i, expert in enumerate(data.itertuples()):
-    # if int(getattr(expert, 'Q2_1')) == 1:  # reversely filled in by expert: flooding risk not important at all?
-    #     data.iloc[i, data.columns.get_loc(col)] = np.abs(int(getattr(expert, col))-6)
 
-overstrPrimm = data['Q2_1'].mean(axis=0).round(decimals=2)
-overstrRegim = data['Q2_2'].mean(axis=0).round(decimals=2)
-bodemdalingm = data['Q2_3'].mean(axis=0).round(decimals=2)
-wtroverlastm = data['Q2_4'].mean(axis=0).round(decimals=2)
-bodembergenm = data['Q2_5'].mean(axis=0).round(decimals=2)
+arit_means, geom_means, stds = [], [], []
+for col in ['Q2_1', 'Q2_2', 'Q2_3', 'Q2_4', 'Q2_5']:
+    arit_mean = data[col].mean(axis=0).round(decimals=3)
+    geom_mean = ahp_util.geo_mean(data[col]).round(decimals=3)
+    std = data[col].std(axis=0).round(decimals=3)
+    arit_means.append(arit_mean)
+    geom_means.append(geom_mean)
+    stds.append(std)
 
-print("    Weging van factoren:", overstrPrimm, overstrRegim, bodemdalingm, wtroverlastm, bodembergenm)
+print("Arithmetic mean:   ", arit_means)
+print("Geometric mean:    ", geom_means)
+print("Standard deviation:", stds)
 
-overstrPrimstd = data['Q2_1'].std(axis=0).round(decimals=2)
-overstrRegistd = data['Q2_2'].std(axis=0).round(decimals=2)
-bodemdalingstd = data['Q2_3'].std(axis=0).round(decimals=2)
-wtroverlaststd = data['Q2_4'].std(axis=0).round(decimals=2)
-bodembergenstd = data['Q2_5'].std(axis=0).round(decimals=2)
+# factors = ['overstrPrim', 'overstrRegi', 'bodemdaling', 'wtroverlast', 'bodembergen']
+# with open(data_url + "/factorweights_{}.csv".format(cluster), 'w') as f:
+#     f.write("Factor,Mean,Std\n")
+#     for p, amean, gmean, std in zip(factors, arit_means, geom_means, stds):
+#         f.write("%s,%0.3f,%0.3f,%0.3f\n" % (p, amean, gmean, std))
 
-print("Std weging van factoren:", overstrPrimstd, overstrRegistd, bodemdalingstd, wtroverlaststd, bodembergenstd)
-means = [overstrPrimm, overstrRegim, bodemdalingm, wtroverlastm, bodembergenm]
-stds = [overstrPrimstd, overstrRegistd, bodemdalingstd, wtroverlaststd, bodembergenstd]
-factors = ['overstrPrim', 'overstrRegi', 'bodemdaling', 'wtroverlast', 'bodembergen']
-with open(data_url + "/factorweights_{}.csv".format(cluster), 'w') as f:
-    f.write("Factor,Mean,Std\n")
-    for p, mean, std in zip(factors, means, stds):
-        f.write("%s,%0.3f,%0.3f\n" % (p, mean, std))
+labels = ['Flooding risk of primary embankments',
+          'Flooding risk of regional embankments',
+          'Ground subsidence',
+          'Bottlenecks excessive rainwater',
+          'Soil water storage capacity']
+labels = ['\n'.join(wrap(x, 20)) for x in labels]
+ylabels = ['Not important',
+           'Somewhat important',
+           'Moderately important',
+           'Quite important',
+           'Extremely important',
+           'Absolutely important']
+ylabels = ['\n'.join(wrap(x, 10)) for x in ylabels]
 
-plt.boxplot(data[['Q2_1', 'Q2_2', 'Q2_3', 'Q2_4', 'Q2_5']],
-            labels=['Overstr Prim', 'Overstr Reg', 'Bodemdaling', 'Wateroverlast', 'Bodemberging'])
+plt.boxplot(data[['Q2_1', 'Q2_2', 'Q2_3', 'Q2_4', 'Q2_5']])
+plt.xticks(ticks=range(1, len(labels) + 1), labels=labels, rotation=90)
+plt.yticks(ticks=[0, 1, 2, 3, 4, 5], labels=ylabels)
+plt.subplots_adjust(bottom=0.4, left=0.25)
+plt.xlabel('Soil and water factors')
+plt.ylabel('Weighting')
+plt.title('Expert-determined factor importance')
 plt.show()

@@ -1,10 +1,7 @@
-import datetime
-
 import pandas as pd
 import numpy as np
 import configparser
 import os
-from sklearn.preprocessing import MinMaxScaler
 from functools import reduce
 
 config = configparser.ConfigParser()
@@ -15,7 +12,7 @@ data_url = config['DEFAULT']['data_url']
 
 def geo_mean(iterable):
     a = np.array(iterable)
-    return a.prod() ** (1.0 / len(a))
+    return (a+1).prod() ** (1.0 / len(a)) - 1
 
 
 def build_matrix(data):
@@ -63,6 +60,7 @@ def compute_consistency_ratio(matrix):
 
 
 def compute_priority_weights(matrix):
+    matrix = np.array([[1e-7 if x == 0 else x for x in sublist] for sublist in matrix])
     eigenvalues, eigenvectors = np.linalg.eig(matrix)
     max_eigenvalue_index = np.argmax(eigenvalues)
     priority_vector = np.real(eigenvectors[:, max_eigenvalue_index])
