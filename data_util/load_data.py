@@ -1,6 +1,7 @@
 import os
 import csv
 from joblib import load
+import itertools
 import configparser
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import numpy as np
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
-config.read(os.path.join(parent(parent(__file__)),'config.ini'))
+config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
 
 
@@ -25,7 +26,7 @@ def load_xy(modifier, model=None):
 
         # load and reverse apply scaler
         ss = load(data_url + '/' + modifier + '/' + "scaler.joblib")
-        df_orig = ss.inverse_transform(X)
+        df_orig = ss.inverse_transform(X[:, 2:])
 
         # prep labels for binary classification
         if model == 'hist_buildings':
@@ -36,14 +37,16 @@ def load_xy(modifier, model=None):
 
         return np.array(X), np.array(y), np.array(df_orig), col_names
     else:  # No labels are used, so take values of an arbitrary labeled df
-        df = pd.read_csv(data_url + '/' + modifier + '/' + 'hist_buildings' + ".csv")
+        # df = pd.read_csv(data_url + '/' + modifier + '/' + 'hist_buildings' + ".csv")
+        df = pd.read_csv(data_url + '/' + modifier + '/' + 'expert_ref' + ".csv")
+
         col_names = list(df.columns)
         df = df.to_numpy()
         X = df[:, :-1]
 
         # load and reverse apply scaler
-        ss = load(data_url + '/' + modifier +'/' + "scaler.joblib")
-        df_orig = ss.inverse_transform(X)
+        ss = load(data_url + '/' + modifier + '/' + "scaler.joblib")
+        df_orig = ss.inverse_transform(X[:, 2:])
 
         return np.array(X), np.array(df_orig), col_names
 
@@ -59,13 +62,20 @@ def load_bg(modifier):
     return bg
 
 
+def flatten(l):
+    l2 = [([x] if isinstance(x, str) else x) for x in l]
+    return list(itertools.chain(*l2))
+
+
 def load_expert(modifier):
-    X1, X2, scores = [], [], []
-    with open(data_url + '/expertscores_{}.csv'.format(modifier), 'r') as f:
-        csvreader = csv.reader(f)
-        next(csvreader)
-        for row in csvreader:
-            X1.append(float(row[1]))  # Mean
-            X2.append(float(row[2]))  # Mean
-            scores.append(float(row[3]))  # Mean
-    return np.array([X1, X2]), np.array(scores)
+    X, y = [], []
+    with open(data_url + '/expertscores_{}.csv'.format(modifier), 'r') as scores_f, open(
+            data_url + '/expert_point_info_{}.csv'.format(modifier), 'r') as info_f:
+        scores_reader = csv.reader(scores_f)
+        info_reader = csv.reader(info_f)
+        next(scores_reader)
+        next(info_reader)
+        for s_row, i_row in zip(scores_reader, info_reader):
+            X.append(flatten([s_row[1], s_row[2], i_row[1:6]]))  # X1, X2, features
+            y.append(s_row[3])
+    return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)

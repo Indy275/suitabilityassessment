@@ -22,6 +22,7 @@ config.read('config.ini')
 
 data_url = config['DEFAULT']['data_url']
 json_headers = json.loads(config['DEFAULT']['json_headers'])
+recreate_labs = config['DATA_CREATION']['recreate_labs']
 
 
 def get_point_data(raster_url, point):
@@ -94,8 +95,8 @@ def get_labels(model, modifier, name, copy, cluster=None):
     geotiff_name = data_url + '/rasters/' + modifier + '/' + name + '.tiff'
     if model == 'expert_ref':  # rough idea: take data points from favourite; geoms are used and value is assigned
         assert cluster is not None
-        if not Path(geotiff_name).is_file():
-            print("No saved .tiff found for layer {}; retrieving data".format(name))
+        if (not Path(geotiff_name).is_file()) or recreate_labs:
+            print("(Re)creating layer {}.tiff.; retrieving expert scores".format(name))
             if cluster == 'OC':
                 dp_url = 'https://hhnk.lizard.net/api/v4/favourites/89c4db99-7a1a-4aa1-8abc-f89133d20d63/'
             elif cluster == 'WS':
@@ -136,7 +137,7 @@ def get_labels(model, modifier, name, copy, cluster=None):
                 out.write_band(1, burned)
 
     elif model == 'hist_buildings':
-        if not Path(geotiff_name).is_file():
+        if (not Path(geotiff_name).is_file()) or recreate_labs:
             print("No saved .tiff found for layer {}; retrieving data".format(name))
 
             gdf = gpd.read_file(data_url + "/waterland1900min.shp")
@@ -168,8 +169,10 @@ def get_fav_data(uuid, modifier, cluster, model, bbox, width, height):
     fav_url = "https://hhnk.lizard.net/api/v4/favourites/{}/".format(uuid)
     r = requests.get(url=fav_url, headers=json_headers)
     data = r.json()['state']
-
-    col_names, combined_sources = [], []
+    lon = np.linspace(min([bbox[0], bbox[2]]), max([bbox[0], bbox[2]]), width)
+    lat = np.linspace(max([bbox[1], bbox[3]]), min([bbox[1], bbox[3]]), height)
+    Y, X = np.meshgrid(lon, lat)
+    col_names, combined_sources = ['lon', 'lat'], [X, Y]
     for layer in data['layers']:
         raster_url = "https://hhnk.lizard.net/api/v4/rasters/{}".format(layer['uuid'])
         col_names.append(layer['name'].strip())
@@ -179,6 +182,7 @@ def get_fav_data(uuid, modifier, cluster, model, bbox, width, height):
 
     label_data = np.array(
         get_labels(model, modifier, name=model, copy=col_names[-2], cluster=cluster))
+
     combined_sources.append(label_data)
     col_names.append(model.strip())
     return np.array(combined_sources), col_names
@@ -195,10 +199,11 @@ def create_df(fav_uuid, modifier, cluster, bbox, width, height, model):
     data_extract3 = np.reshape(data_extract2, (-1, data_extract2.shape[-1]))
 
     ss = StandardScaler()
-    extracted_feats = ss.fit_transform(data_extract3[:, :-1])
+    extracted_loc = data_extract3[:, :2]
+    extracted_feats = ss.fit_transform(data_extract3[:, 2:-1])
     extracted_labs = data_extract3[:, -1]
 
-    extracted = np.concatenate((extracted_feats, extracted_labs.reshape((-1, 1))), axis=1)
+    extracted = np.concatenate((extracted_loc, extracted_feats, extracted_labs.reshape((-1, 1))), axis=1)
     df4 = pd.DataFrame(extracted, columns=col_names)
     df4.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
     dump(ss, data_url + '/' + modifier + "/scaler.joblib")
