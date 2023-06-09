@@ -4,6 +4,7 @@ import numpy as np
 from textwrap import wrap
 import matplotlib as mpl
 
+
 def plot_f_importances(coef, names):
     imp = coef
     imp = np.abs(imp)
