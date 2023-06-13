@@ -18,16 +18,15 @@ data_url = config['DEFAULT']['data_url']
 def load_xy(modifier, model=None):
     if model:
         df = pd.read_csv(data_url + '/' + modifier + '/' + model + ".csv")
+        # df.drop(['Overstromingsbeeld primaire keringen', 'Overstromingsbeeld regionale keringen', 'Bodemdaling Huidig', 'inundatiediepte T100'], axis=1, inplace=True)
         col_names = list(df.columns)
         df = df.to_numpy()
-
         X = df[:, :-1]
         y = df[:, -1]
 
         # load and reverse apply scaler
         ss = load(data_url + '/' + modifier + '/' + "scaler.joblib")
         df_orig = ss.inverse_transform(X[:, 2:])
-
         # prep labels for binary classification
         if model == 'hist_buildings':
             y[y < 0] = 0

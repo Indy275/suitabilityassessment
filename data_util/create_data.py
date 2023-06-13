@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import zscore
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
@@ -37,11 +38,9 @@ def get_raster_data(raster_url, modifier, name, bbox, width, height):
     geotiff_name_msk = data_url + '/rasters/' + modifier + '/msk_' + name + '.tiff'
 
     if not Path(geotiff_name_msk).is_file():
-        # if True:
         print("No masked .tiff-file found for layer {}; retrieving and extracting data".format(name))
         geotiff_name = data_url + '/rasters/' + modifier + '/' + name + '.tiff'
         if not Path(geotiff_name).is_file():
-            # if True:
             bbox_str = ','.join(map(str, bbox))  # API requests a string-formatted list for some reason
             r = requests.get(url=raster_url + '/data/',
                              headers=json_headers,
@@ -171,7 +170,7 @@ def get_fav_data(uuid, modifier, cluster, model, bbox, width, height):
     data = r.json()['state']
     lon = np.linspace(min([bbox[0], bbox[2]]), max([bbox[0], bbox[2]]), width)
     lat = np.linspace(max([bbox[1], bbox[3]]), min([bbox[1], bbox[3]]), height)
-    Y, X = np.meshgrid(lon, lat)
+    Y, X = np.meshgrid(lon, lat)  # This intentionally swapped: numpy
     col_names, combined_sources = ['lon', 'lat'], [X, Y]
     for layer in data['layers']:
         raster_url = "https://hhnk.lizard.net/api/v4/rasters/{}".format(layer['uuid'])
@@ -192,19 +191,32 @@ def create_df(fav_uuid, modifier, cluster, bbox, width, height, model):
     if not os.path.exists(data_url + '/' + modifier):
         os.makedirs(data_url + '/' + modifier)
         os.makedirs(data_url + '/rasters/' + modifier)
+
+    # Retrieve layer data based on a favourite instance
     extracted_data, col_names = get_fav_data(fav_uuid, modifier, cluster, model, bbox, width, height)
 
+    # NaN values are explicitly set to NaN instead of -9999
     extracted_data[extracted_data < -9000] = np.nan
+
+    # (n_feat, w, h) -> (w x h, n_feat)
     data_extract2 = np.transpose(extracted_data, (1, 2, 0))
     data_extract3 = np.reshape(data_extract2, (-1, data_extract2.shape[-1]))
 
+    # Normalize the features (without normalizing location and labels)
     ss = StandardScaler()
     extracted_loc = data_extract3[:, :2]
     extracted_feats = ss.fit_transform(data_extract3[:, 2:-1])
     extracted_labs = data_extract3[:, -1]
-
     extracted = np.concatenate((extracted_loc, extracted_feats, extracted_labs.reshape((-1, 1))), axis=1)
-    df4 = pd.DataFrame(extracted, columns=col_names)
-    df4.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
+
+    df = pd.DataFrame(extracted, columns=col_names)
+
+    # Change outlier values: more than 3 standard deviations from mean are set to 95% percentile
+    for column in df.columns[2:-1]:
+        threshold = np.nanpercentile(df[column], 95)
+        mask = zscore(df[column], nan_policy='omit') > 3
+        df.loc[mask, column] = threshold
+
+    df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
     dump(ss, data_url + '/' + modifier + "/scaler.joblib")
     print("Data with shape {} saved to {}.csv".format(extracted.shape, modifier))
