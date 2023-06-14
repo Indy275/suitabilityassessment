@@ -24,7 +24,7 @@ class DashApp():
         self.app = Dash(__name__)
         if w_model:
             if w_model == 'expert':
-                weights_init = pd.read_csv(data_url + "/factorweights_OC.csv")
+                weights_init = pd.read_csv(data_url + "/factorweights_WS.csv")
                 weights_init = weights_init['Mean']
             else:
                 weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
@@ -32,6 +32,8 @@ class DashApp():
         else:
             weights_init = np.repeat([1], 5)
         unweighted_df, df_orig, col_names = load_data.load_xy(modifier)
+        unweighted_df = unweighted_df[:, 2:]
+        col_names = col_names[2:-1]
         unweighted_df[np.isnan(unweighted_df)] = 0
         df_orig[np.isnan(df_orig)] = 0
 

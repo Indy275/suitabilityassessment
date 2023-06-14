@@ -22,10 +22,12 @@ print("Number of participants that completed factorweighting:",len(data))
 weights = pd.DataFrame(columns=list('ABCDEFGHIJKLMNOPQRSTUVWXYZab'))
 n_completed_surveys = 0
 consistency_ratio = []
+duration = []
 for index, expert in data.iterrows():
     df_expert = data.iloc[[index-2]]  # -2 is hardcoded since index 2 is first row (before is header)
     df_expert = df_expert.dropna(axis=1, how='all')
     if len(df_expert.columns) > 28:  # A completed survey has 29 columns: 10 comparisons; 6 other question; 13 metadata
+        print("expert in",df_expert['Q1'])
         n_completed_surveys +=1
         matrix = ahp_util.build_matrix(df_expert)
         points = list(df_expert.columns[-10].split('_')[1] + df_expert.columns[-9].split('_')[1][1] + df_expert.columns[-1].split('_')[1])
@@ -37,9 +39,19 @@ for index, expert in data.iterrows():
         new_df = pd.DataFrame(weight_dict, index=[0])
         weights = pd.concat([weights, new_df], ignore_index=True)
         consistency_ratio.append(ahp_util.compute_consistency_ratio(np.squeeze(matrix)))
+        if int(df_expert['Duration_(in_seconds)']) < 3600:
+            duration.append(int(df_expert['Duration_(in_seconds)']))
+        else:
+            print("expert took very long:",int(df_expert['Duration_(in_seconds)']))
 
 print("Number of participants that completed survey:",n_completed_surveys)
 print("min mean max consistency:", np.min(consistency_ratio),np.mean(consistency_ratio),np.max(consistency_ratio))
+print(np.array(duration)/60)
+dura = np.array(duration)/60
+dura = dura[dura<100]
+print("min mean max duration:", np.min(dura),np.mean(dura),np.max(dura))
+print(list(zip(np.array(duration)/60, consistency_ratio)))
+
 
 mean_weight = weights.replace(0, np.NaN).mean(axis=0).replace(np.NaN,0)
 # TODO: replace with geometric mean to follow Saaty's AHP

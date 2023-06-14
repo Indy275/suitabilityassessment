@@ -28,19 +28,21 @@ def save_imp(imp, names, model, modifier):
 
 def train_predict(X_train, y_train, X_test, y_test, test_w, test_h, model, modifier, col_names, plot_fimp=0):
     n_feats = X_train.shape[-1]
-    test_nans = np.isnan(X_test)
-
     train_vals = y_train != 0
-    test_vals = y_test != 0
-
-    X_test = X_test[~test_nans]
     X_train = X_train[train_vals]
-    y_train = y_train[train_vals]
     X_train = X_train.reshape((-1, n_feats))
-    X_test = X_test.reshape((-1, n_feats))
+    X_train = X_train[:, 2:]  # Exclude lon, lat
+    y_train = y_train[train_vals]
 
+    test_vals = y_test != 0
+    test_nans = np.isnan(X_test).any(axis=1)
+    X_test = X_test[~test_nans]
+    X_test = X_test.reshape((-1, n_feats))
+    X_test = X_test[:, 2:]  # Exclude lon, lat
+
+    col_names = col_names[2:-1]
     y_preds = np.zeros(y_test.shape)
-    y_preds[test_nans[:, 0]] = np.nan
+    y_preds[test_nans] = np.nan
 
     if model == 'gbr':
         reg = GradientBoostingRegressor()
@@ -52,8 +54,8 @@ def train_predict(X_train, y_train, X_test, y_test, test_w, test_h, model, modif
         # y_pred /= conf_int
         # y_pred[y_pred > conf_int] = conf_int
         if plot_fimp:
-            plot.plot_f_importances(reg.feature_importances_, col_names[:-1])
-            save_imp(reg.feature_importances_, col_names[:-1], model, modifier)
+            plot.plot_f_importances(reg.feature_importances_, col_names)
+            save_imp(reg.feature_importances_, col_names, model, modifier)
     elif model == 'svm':
         posfeat = [feat for feat, lab in zip(X_train, y_train) if lab > 0]
         kernel = 'linear'  # 'linear'
@@ -62,14 +64,16 @@ def train_predict(X_train, y_train, X_test, y_test, test_w, test_h, model, modif
         y_pred = svm.predict(X_test)
         y_pred2 = svm.score_samples(X_test)
         if plot_fimp and kernel == 'linear':
-            plot.plot_f_importances(svm.coef_[0], col_names[:-1])
-            save_imp(svm.coef_[0], col_names[:-1], model, modifier)
+            plot.plot_f_importances(svm.coef_[0], col_names)
+            save_imp(svm.coef_[0], col_names, model, modifier)
     else:
         print("Invalid model; should be one of ['gbr','svm']")
         y_pred = np.repeat(0, y_preds[~test_nans[:, 0]].shape)
-    y_preds[~test_nans[:, 0]] = y_pred
-    mse = mean_squared_error(y_test[test_vals], y_preds[test_vals])
-    print("Test MSE: {:.4f}".format(mse))
+
+    y_preds[~test_nans] = y_pred
+    if sum(test_vals)>0:  # Only perform MSE test if we have test labels
+        mse = mean_squared_error(y_test[test_vals], y_preds[test_vals])
+        print("Test MSE: {:.4f}".format(mse))
     pd.DataFrame(y_preds).to_csv(data_url + '/' + modifier + "/" + model + "_pred.csv")
     if plot_pred:
         plot.plot_prediction(y_preds, test_h)
