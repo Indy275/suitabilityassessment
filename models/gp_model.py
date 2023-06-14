@@ -2,7 +2,7 @@ import configparser
 import numpy as np
 
 from data_util import load_data
-from plotting import plot_gp
+from plotting import gp_plot
 
 import torch
 
