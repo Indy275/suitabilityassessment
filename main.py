@@ -17,7 +17,7 @@ test_mod = config['MODEL_SETTINGS']['test_mod']
 ref_std = config['TRAIN_SETTINGS']['ref_std']
 cluster = config['TRAIN_SETTINGS']['cluster']
 ml_model = config['MODEL_SETTINGS']['ml_model']
-
+data_url = config['DEFAULT']['data_url']
 
 bbox = {'schermerbeemster': '4.78729, 52.59679, 4.88033, 52.53982',
         'purmer': '5.04805, 52.52374, 4.93269, 52.46846',
