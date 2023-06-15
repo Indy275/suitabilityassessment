@@ -184,7 +184,7 @@ def switch_layer(uuid, bool):
     for l in r['state']['layers']:
         l['active'] = bool
         l['opacity'] = 1
-    #     # if not l['name'] == "Bodemberging bij gemiddelde hoogste grondwaterstand - Huidig klimaat":
+        # if not l['name'] == "Bodemberging bij grondwaterstand gelijk aan streefpeil":
         new_layer.append(l)
     # bodemberging = {
     #             "name": "Bodemberging bij grondwaterstand gelijk aan streefpeil",
@@ -204,12 +204,14 @@ def switch_layer(uuid, bool):
     r = requests.patch('https://hhnk.lizard.net/api/v4/favourites/{}/'.format(uuid), json=r, headers=json_headers)
     print("Patching geometry:", r.status_code, r.reason)
 
-uuid_list = []
-uuid_list.append(get_uuidlist(startswith='Comparisons_WSB')) #'Comparisons_WSB'   'testfav'
+
+uuid_list = [] #['97ffd069-1da0-43f3-964e-cdded4a8565b', '97ffd069-1da0-43f3-964e-cdded4a8565b']
+# uuid_list.append(get_uuidlist(startswith='Comparisons_WSB')) #'Comparisons_WSB'   'testfav'
 # uuid_list.append(get_uuidlist(startswith='Comparisons_WSB7_GR')) #'Comparisons_WSB'   'testfav'
 # uuid_list.append(get_uuidlist(startswith='Comparisons_WSB6_HR')) #'Comparisons_WSB'   'testfav'
 # uuid_list.append(get_uuidlist(startswith='Comparisons_WSB7_KR')) #'Comparisons_WSB'   'testfav'
-print(len(uuid_list[0]), uuid_list)
+
 uuid_list = np.squeeze(uuid_list)
+print(len(uuid_list), uuid_list)
 for uid in uuid_list:
     switch_layer(uid, bool=True)
