@@ -23,6 +23,9 @@ def plot_prediction(y_pred, height):
     except:
         pass
     y_pred = np.ma.masked_invalid(y_pred)
+
+    y_pred = np.digitize(y_pred, np.quantile(y_pred, [0, 0.2, 0.4, 0.6, 0.8, 1.0]))  # digitized values: 5 classes
+
     print("predictions are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_pred), np.nanmax(y_pred)))
     img = plt.imshow(y_pred.reshape((height, -1)), vmin=np.nanmin(y_pred), vmax=np.nanmax(y_pred))  # Should this be swapped? Even though it doesn't matter for square img
     plt.set_cmap(colmap)
@@ -31,7 +34,7 @@ def plot_prediction(y_pred, height):
 
     sigmoid = lambda x: 1 / (1 + np.exp(-.5*(x-.5)))
     y_pred = sigmoid(y_pred)
-    print("logpredictionscores", np.nanmin(y_pred), np.nanmax(y_pred))
+    print("sigmoid transformed predictions are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_pred), np.nanmax(y_pred)))
     img = plt.imshow(y_pred.reshape((height, -1)), vmin=np.nanmin(y_pred), vmax=np.nanmax(y_pred))
     plt.set_cmap(colmap)
     img.cmap.set_bad('tab:blue')
@@ -52,4 +55,11 @@ def plot_colorbar():
     mpl.colorbar.ColorbarBase(ax1, cmap=colmap,
                                     norm=norm,
                                     orientation='horizontal')
+    plt.show()
+
+
+def plot_loss(loss):
+    plt.plot(loss)
+    plt.xlabel("Iterations")
+    _ = plt.ylabel("Loss")
     plt.show()

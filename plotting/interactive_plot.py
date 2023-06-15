@@ -15,6 +15,8 @@ parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 
 data_url = config['DEFAULT']['data_url']
+cluster = config['TRAIN_SETTINGS']['cluster']
+
 
 sign = [-1, -1, -1, -1, -1]  # 1 if higher is better; -1 if lower is better
 
@@ -24,8 +26,8 @@ class DashApp():
         self.app = Dash(__name__)
         if w_model:
             if w_model == 'expert':
-                weights_init = pd.read_csv(data_url + "/factorweights_WS.csv")
-                weights_init = weights_init['Mean']
+                weights_init = pd.read_csv(data_url + "/factorweights_{}.csv".format(cluster))
+                weights_init = weights_init['Median']
             else:
                 weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
                 weights_init = weights_init['importance']
@@ -36,6 +38,10 @@ class DashApp():
         col_names = col_names[2:-1]
         unweighted_df[np.isnan(unweighted_df)] = 0
         df_orig[np.isnan(df_orig)] = 0
+
+        # nan_df, _, _ = load_data.load_xy(modifier)
+        # nan_df = nan_df[:, -1]
+        # nan_df = np.array(nan_df).reshape((-1, 1))
 
         feature0 = df_orig[:, 0].reshape((h, w))
         feature1 = df_orig[:, 1].reshape((h, w))
@@ -101,7 +107,34 @@ class DashApp():
 
             weighted_df = weighted_df.reshape((h, w))
             colmap = [[0.0, 'rgb(255,0,0)'], [1.0, 'rgb(145,210, 80)']]
+
+            # # Python got retarded so this part is ignored -idea was to mask parts of the map that are water
+            # nan_df, _, _ = load_data.load_xy(modifier)
+            # nan_df = nan_df[:, -1]
+            # nan_df = np.array(nan_df).reshape((-1, 1))
+            # print("weighteddf0",weighted_df[0])
+            # print("nandf",nan_df[0])
+            # mask = np.ma.masked_where(~(np.isfinite(nan_df)), nan_df)
+            # weighted_df = np.ma.masked_where(~(np.isfinite(nan_df)), weighted_df).reshape((h, w))
+            # print("weighteddf1shape",weighted_df.shape)
+            # print("maskshape",mask.shape)
+            # print("mask",mask[0], mask[55555])
+            # print("gothere")
+            # weighted_df = np.squeeze(weighted_df)
+            # nan_df = np.squeeze(nan_df)
+            # weighted_df = weighted_df[~nan_df]
+            # print("gotheretoo")
+            # print("weighteddf2",weighted_df[0])
+            # weighted_df = np.array(weighted_df).reshape((h, w))
+            # print("weighteddf3",weighted_df[0])
+            # fig = px.imshow(nan_df, color_continuous_scale=[[0.0, 'rgb(0,0,255)'], [1.0, 'rgb(0,0,255)']])
+
             fig = px.imshow(weighted_df, labels=dict(color='suitability_score'), color_continuous_scale=colmap)
+            fig.update_layout(
+                plot_bgcolor='blue',
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=False),
+            )
             updated = ctx.triggered_id
             if updated:
                 updated = int(updated[-1]) - 1
