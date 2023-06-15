@@ -13,41 +13,35 @@ parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
 
-choice_data = 'Bodem en Watersturend WS v2_May 30, 2023_11.23'
 numeric_data = 'Bodem en Watersturend WS v2_June 9, 2023_09.44'
 cluster = 'WS'
 
-df = ahp_util.read_survey_data(choice_data, datetime.date(2023, 5, 23))
 data = ahp_util.read_survey_data(numeric_data, datetime.date(2023, 5, 23))
 
-df.dropna(subset=['Q1'], inplace=True)
 data.dropna(subset=['Q1'], inplace=True)  # Drop all reports in which question was not answered
 
 for col in ['Q2_5', 'Q2_4', 'Q2_3', 'Q2_2', 'Q2_1']:
     data[col] = pd.to_numeric(data[col])
-    print("da", data[col])
-    print("df", df[col])
     data[col] = np.where(data[col] == 1, 0, data[col])
     data[col] = np.where(data[col] == 6, 1, data[col])  # Qualtrics error: 'Een beetje belangrijk' is seen as 6
 
-arit_means, geom_means, stds = [], [], []
+arit_means, geom_means, medians, stds = [], [], [], []
 for col in ['Q2_1', 'Q2_2', 'Q2_3', 'Q2_4', 'Q2_5']:
-    arit_mean = data[col].mean(axis=0).round(decimals=3)
-    geom_mean = ahp_util.geo_mean(data[col]).round(decimals=3)
-    std = data[col].std(axis=0).round(decimals=3)
-    arit_means.append(arit_mean)
-    geom_means.append(geom_mean)
-    stds.append(std)
+    arit_means.append(data[col].mean(axis=0).round(decimals=3))
+    geom_means.append(ahp_util.geo_mean(data[col]).round(decimals=3))
+    medians.append(data[col].median(axis=0).round(decimals=3))
+    stds.append(data[col].std(axis=0).round(decimals=3))
 
 print("Arithmetic mean:   ", arit_means)
 print("Geometric mean:    ", geom_means)
+print("Median:            ", medians)
 print("Standard deviation:", stds)
 
-# factors = ['overstrPrim', 'overstrRegi', 'bodemdaling', 'wtroverlast', 'bodembergen']
-# with open(data_url + "/factorweights_{}.csv".format(cluster), 'w') as f:
-#     f.write("Factor,Mean,Std\n")
-#     for p, amean, gmean, std in zip(factors, arit_means, geom_means, stds):
-#         f.write("%s,%0.3f,%0.3f,%0.3f\n" % (p, amean, gmean, std))
+factors = ['overstrPrim', 'overstrRegi', 'bodemdaling', 'wtroverlast', 'bodembergen']
+with open(data_url + "/factorweights_{}.csv".format(cluster), 'w') as f:
+    f.write("Factor,Mean,Geomean,Median,Std\n")
+    for p, amean, gmean, mdn, std in zip(factors, arit_means, geom_means, medians, stds):
+        f.write("%s,%0.3f,%0.3f,%0.3f,%0.3f\n" % (p, amean, gmean, mdn, std))
 
 labels = ['Flooding risk of primary embankments',
           'Flooding risk of regional embankments',
