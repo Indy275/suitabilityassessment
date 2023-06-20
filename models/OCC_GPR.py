@@ -24,7 +24,6 @@ def GPR_OCC(K, Ks, Kss, mode, kernel_centering=None):
     noise = 0.01
     K = K + noise * np.eye(K.shape[0])
     Kss = Kss + noise * np.ones(Kss.shape)
-
     L = np.linalg.cholesky(K).T
     alpha = np.linalg.solve(L.T, np.linalg.solve(L, np.ones(K.shape[0])))
 
@@ -63,7 +62,7 @@ def kcenter(K, Ks=None, Kss=None):
 
 ls = -4
 o_var = -5.5
-ref_std = 'expert_ref'
+ref_std = 'hist_buildings'
 train_mod = 'purmerend'
 width, height = 40, 40
 X, Y, _, _ = load_data.load_xy(train_mod, ref_std)
@@ -71,10 +70,12 @@ X = Y.reshape((height, width))
 X2 = np.nonzero(X)[0]
 X1 = np.nonzero(X)[1]
 
-Xrange = np.arange(np.min(X1) - 0.2 * (np.max(X1) - np.min(X1)), np.max(X1) + 0.2 * (np.max(X1) - np.min(X1)) + 0.01, 0.2)
-Yrange = np.arange(np.min(X2) - 0.2 * (np.max(X2) - np.min(X2)), np.max(X2) + 0.2 * (np.max(X2) - np.min(X2)) + 0.01, 0.2)
+Xrange = np.arange(np.min(X1) - 0.2 * (np.max(X1) - np.min(X1)), np.max(X1) + 0.2 * (np.max(X1) - np.min(X1)) + 0.01,
+                   0.2)
+Yrange = np.arange(np.min(X2) - 0.2 * (np.max(X2) - np.min(X2)), np.max(X2) + 0.2 * (np.max(X2) - np.min(X2)) + 0.01,
+                   0.2)
+print(f"{ np.min(X1)=} {np.max(X1)=} { np.min(X2)=} {np.max(X2)=}")
 
-print("minXY, maxXY", np.min(X1), np.min(X2), np.max(X1), np.max(X2))
 test = np.zeros((len(Xrange) * len(Yrange), 2))
 c = 0
 for i in Xrange:
@@ -82,17 +83,21 @@ for i in Xrange:
         test[c, :] = [i, j]
         c += 1
 
+print(f"{test.shape=} {len(Xrange)=} {len(Yrange)=}")
+
 K, Ks, Kss = se_kernel([ls, o_var], np.vstack((X1, X2)), test)
-print("K, Ks, Kss",K.shape, Ks.shape, Kss.shape)
-modes = ['mean','var','pred','ratio']
+print(f"{K.shape=} {Ks.shape=} {Kss.shape=}")
+
+modes = ['mean', 'var', 'pred', 'ratio']
 titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
           r'log. moment ratio $\mu_*/\sigma_*$']
 
 for i in range(len(modes)):
     score = GPR_OCC(K, Ks, Kss, modes[i])
+    print(f"{score.T=} {score.shape=}")
 
     ax = plt.subplot(2, 2, i + 1)
-    ax.pcolormesh(Xrange, Yrange,score.reshape(len(Yrange), len(Xrange)),cmap='gray')
+    ax.pcolormesh(Xrange, Yrange, score.reshape(len(Yrange), len(Xrange)), cmap='gray')
     ax.set_title(titles[i])
     ax.set_xlim([min(Xrange), max(Xrange)])
     ax.set_ylim([min(Yrange), max(Yrange)])
