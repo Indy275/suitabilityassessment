@@ -4,6 +4,7 @@ from joblib import load
 import itertools
 import configparser
 from pathlib import Path
+import matplotlib.image as mpimg
 
 import pandas as pd
 import rasterio
@@ -51,10 +52,11 @@ def load_xy(modifier, model=None):
 
 
 def load_bg(modifier):
-    bg_tiff = data_url + '/' + modifier + '/bg_downscaled' + '.tif'
-    if Path(bg_tiff).is_file():
-        with rasterio.open(bg_tiff) as f:  # Write raster data to disk
-            bg = f.read(1)
+    bg_png = data_url + '/' + modifier + '/bg_downscaled' + '.png'
+    if Path(bg_png).is_file():
+        # with rasterio.open(bg_tiff) as f:  # Write raster data to disk
+        #     bg = f.read(1)
+        bg = mpimg.imread(bg_png)
     else:
         bg = np.zeros((10, 10))
         bg += 1e-4
