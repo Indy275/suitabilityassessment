@@ -13,8 +13,8 @@ def plot_f_importances(coef, names):
     plot_pred.plot_f_importances(coef, names)
 
 
-def plot_prediction(y_pred, height):
-    plot_pred.plot_prediction(y_pred, height)
+def plot_prediction(y_pred, height, digitize_pred=False, sigmoid_pred=False, ax=None):
+    return plot_pred.plot_prediction(y_pred, height, digitize_pred=digitize_pred, sigmoid_pred=sigmoid_pred, ax=ax)
 
 
 def plot_gp(Xtest, test_w, test_h, model=None, ax=None):
@@ -23,3 +23,7 @@ def plot_gp(Xtest, test_w, test_h, model=None, ax=None):
 
 def plot_loss(loss):
     plot_pred.plot_loss(loss)
+
+
+def set_colmap(img):
+    plot_pred.set_colmap(img)

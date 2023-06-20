@@ -20,23 +20,26 @@ def plot_xy(X_train, y_train, X_test, y_test, train_h, train_w, test_h, test_w):
     plt.show()
 
 
-def plot_y(y_train, y_test, bg_train, bg_test, train_w, train_h, test_w, test_h,):
-    fig, ax = plt.subplots(2, 2)
-    # cmap = colors.Colormap('Set1_r')
-    # cmap.set_bad('black')
-    ax[0, 0].imshow(y_train.reshape((train_h, train_w)), cmap='Set1_r')
-    posperc = len(y_train[y_train != 0]) / len(y_train) * 100
-    ax[0, 0].set_title("Train labels: {} positive ({:.3f}%)".format(len(y_train[y_train != 0]), posperc))
+def plot_row(y, bg, y_t, ax, i, h, w):
+    ax[i].imshow(bg, extent=[0, h, 0, w])
+    indices = np.nonzero(y.reshape((h, w)))
+    ax[i].scatter(indices[1], np.abs(indices[0]-h), s=1, c='r')
+    posperc = len(y[y != 0]) / len(y) * 100
 
-    ax[0, 1].imshow(bg_train, cmap='Set3')
-    ax[0, 1].set_title("Train area")
+    ax[i].set_title("{} labels: {} positive ({:.2f}%)".format(y_t, len(y[y != 0]), posperc))
+    ax[i].tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False)
 
-    ax[1, 0].imshow(y_test.reshape((test_h, test_w)), cmap='Set1_r')
-    posperc = len(y_test[y_test != 0]) / len(y_test) * 100
-    ax[1, 0].set_title("Test labels: {} positive ({:.3f}%)".format(len(y_test[y_test != 0]), posperc))
 
-    ax[1, 1].imshow(bg_test, cmap='Set3')
-    ax[1, 1].set_title("Test area")
+def plot_y(y_train, y_test, bg_train, bg_test, train_w, train_h, test_w, test_h):
+    fig, ax = plt.subplots(1, 2)
 
+    bg = [bg_train, bg_test]
+    y = [y_train, y_test]
+    y_t = ['Train', 'Test']
+    height = [train_h, test_h]
+    width = [train_w, test_w]
+
+    for i, (y_i, b, y_t_i, h, w) in enumerate(zip(y, bg, y_t, height, width)):
+        plot_row(y_i, b, y_t_i, ax, i, h, w)
     plt.tight_layout()
     plt.show()
