@@ -15,18 +15,16 @@ parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 
 data_url = config['DEFAULT']['data_url']
-cluster = config['TRAIN_SETTINGS']['cluster']
-
 
 sign = [-1, -1, -1, -1, -1]  # 1 if higher is better; -1 if lower is better
 
 
 class DashApp():
-    def __init__(self, modifier, w, h, w_model=None):
+    def __init__(self, modifier, size, w_model=None):
         self.app = Dash(__name__)
         if w_model:
             if w_model == 'expert':
-                weights_init = pd.read_csv(data_url + "/factorweights_{}.csv".format(cluster))
+                weights_init = pd.read_csv(data_url + "/factorweights_{}.csv".format(modifier))
                 weights_init = weights_init['Median']
             else:
                 weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
@@ -43,11 +41,11 @@ class DashApp():
         # nan_df = nan_df[:, -1]
         # nan_df = np.array(nan_df).reshape((-1, 1))
 
-        feature0 = df_orig[:, 0].reshape((h, w))
-        feature1 = df_orig[:, 1].reshape((h, w))
-        feature2 = df_orig[:, 2].reshape((h, w))
-        feature3 = df_orig[:, 3].reshape((h, w))
-        feature4 = df_orig[:, 4].reshape((h, w))
+        feature0 = df_orig[:, 0].reshape((size, size))
+        feature1 = df_orig[:, 1].reshape((size, size))
+        feature2 = df_orig[:, 2].reshape((size, size))
+        feature3 = df_orig[:, 3].reshape((size, size))
+        feature4 = df_orig[:, 4].reshape((size, size))
 
         self.app.layout = html.Div([
             dcc.Graph(id='graph-with-slider'),
@@ -105,8 +103,10 @@ class DashApp():
             min_max_val = 5
             weighted_df *= (min_max_val * -1 / weighted_df.min())
 
-            weighted_df = weighted_df.reshape((h, w))
-            colmap = [[0.0, 'rgb(255,0,0)'], [1.0, 'rgb(145,210, 80)']]
+            weighted_df = weighted_df.reshape((size, size))
+            nullval = weighted_df[0][0]
+            weighted_df[weighted_df == nullval] = weighted_df.min()-0.001
+            colmap = [[0.0, 'rgb(31,119,180)'], [0.00001, 'rgb(255,0,0)'], [1.0, 'rgb(145,210, 80)']]
 
             # # Python got retarded so this part is ignored -idea was to mask parts of the map that are water
             # nan_df, _, _ = load_data.load_xy(modifier)

@@ -5,14 +5,14 @@ from textwrap import wrap
 import matplotlib as mpl
 
 
-def set_colmap(img):
+def set_colmap():
     colmap = LinearSegmentedColormap.from_list('colmap2', [[1, 0, 0, 1], [145 / 255, 210 / 255, 80 / 255, 1]])
     try:
         plt.register_cmap(cmap=colmap)
     except:
         pass
     plt.set_cmap(colmap)
-    img.cmap.set_bad('tab:blue')
+    return colmap
 
 
 def plot_f_importances(coef, names):
@@ -26,12 +26,11 @@ def plot_f_importances(coef, names):
     plt.show()
 
 
-def plot_prediction(y_pred, height, digitize_pred=False, sigmoid_pred=False, ax=None):
+def plot_prediction(y_pred, height, figname, digitize_pred=False, sigmoid_pred=False, ax=None):
     X1 = y_pred[:, 0]
     X2 = y_pred[:, 1]
     y_pred = y_pred[:, 2]
     y_pred = np.ma.masked_invalid(y_pred)
-
 
     if digitize_pred:
         y_pred = np.digitize(y_pred, np.quantile(y_pred, [0, 0.2, 0.4, 0.6, 0.8, 1.0]))  # digitized values: 5 classes
@@ -45,11 +44,13 @@ def plot_prediction(y_pred, height, digitize_pred=False, sigmoid_pred=False, ax=
 
     if ax is None:
         fig, ax = plt.subplots()
-    # img = ax.imshow(y_pred.reshape((height, -1)), vmin=np.nanmin(y_pred), vmax=np.nanmax(y_pred))  # Should this be swapped? Even though it doesn't matter for square img
-    img = ax.imshow(y_pred.reshape((height, -1)), vmin=np.nanmin(y_pred),
-                     vmax=np.nanmax(y_pred), extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)], aspect='auto')
-    set_colmap(img)
-    plt.show()  # Show original prediction
+    set_colmap()
+    img = ax.imshow(y_pred.reshape((height, -1)), vmin=np.nanmin(y_pred), vmax=np.nanmax(y_pred),
+                    extent=[np.nanmin(X2), np.nanmax(X2), np.nanmin(X1), np.nanmax(X1)], aspect='auto')
+    img.cmap.set_bad('tab:blue')
+
+    plt.savefig(figname)
+    plt.show()
 
 
 def plot_colorbar():

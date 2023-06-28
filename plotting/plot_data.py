@@ -22,22 +22,24 @@ def plot_xy(X_train, y_train, X_test, y_test, train_h, train_w, test_h, test_w):
 
 def plot_row(y, bg, y_t, ax, i, h, w):
     ax[i].imshow(bg, extent=[0, h, 0, w])
-    indices = np.nonzero(y.reshape((h, w)))
-    ax[i].scatter(indices[1], np.abs(indices[0]-h), s=1, c='r')
-    posperc = len(y[y != 0]) / len(y) * 100
+    if y_t != 'Test':
+        indices = np.nonzero(y.reshape((h, w)))
+        ax[i].scatter(indices[1], np.abs(indices[0] - h), s=1, c='r')
+        posperc = len(y[y != 0]) / len(y) * 100
 
-    ax[i].set_title("{} labels: {} positive ({:.2f}%)".format(y_t, len(y[y != 0]), posperc))
+        ax[i].set_title("{} labels: {} positive ({:.2f}%)".format(y_t, len(y[y != 0]), posperc))
     ax[i].tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False)
+    ax[i].yaxis.set_ticklabels([])
 
 
-def plot_y(y_train, y_test, bg_train, bg_test, train_w, train_h, test_w, test_h):
+def plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size):
     fig, ax = plt.subplots(1, 2)
 
     bg = [bg_train, bg_test]
     y = [y_train, y_test]
     y_t = ['Train', 'Test']
-    height = [train_h, test_h]
-    width = [train_w, test_w]
+    height = [train_size, test_size]
+    width = [train_size, test_size]
 
     for i, (y_i, b, y_t_i, h, w) in enumerate(zip(y, bg, y_t, height, width)):
         plot_row(y_i, b, y_t_i, ax, i, h, w)

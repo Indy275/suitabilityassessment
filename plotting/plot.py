@@ -5,16 +5,16 @@ def plot_xy(X_train, y_train, X_test, y_test, train_h, train_w, test_h, test_w):
     plot_data.plot_xy(X_train, y_train, X_test, y_test, train_h, train_w, test_h, test_w)
 
 
-def plot_y(y_train, y_test, bg_train, bg_test, train_w, train_h, test_w, test_h,):
-    plot_data.plot_y(y_train, y_test, bg_train, bg_test, train_w, train_h, test_w, test_h,)
+def plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size):
+    plot_data.plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size)
 
 
 def plot_f_importances(coef, names):
     plot_pred.plot_f_importances(coef, names)
 
 
-def plot_prediction(y_pred, height, digitize_pred=False, sigmoid_pred=False, ax=None):
-    return plot_pred.plot_prediction(y_pred, height, digitize_pred=digitize_pred, sigmoid_pred=sigmoid_pred, ax=ax)
+def plot_prediction(y_pred, height, figname,digitize_pred=False, sigmoid_pred=False, ax=None):
+    return plot_pred.plot_prediction(y_pred, height, figname, digitize_pred=digitize_pred, sigmoid_pred=sigmoid_pred, ax=ax)
 
 
 def plot_gp(Xtest, test_w, test_h, model=None, ax=None):
@@ -25,5 +25,5 @@ def plot_loss(loss):
     plot_pred.plot_loss(loss)
 
 
-def set_colmap(img):
-    plot_pred.set_colmap(img)
+def set_colmap():
+    return plot_pred.set_colmap()
