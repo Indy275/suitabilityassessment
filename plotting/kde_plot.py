@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
 from scipy.stats import gaussian_kde
 
-from data_util import load_data
+from data_util import data_loader
 from plotting import plot
 
 import configparser
@@ -17,7 +17,7 @@ config.read('config.ini')
 
 
 def run_model(train_mod, test_h):
-    X, Y, _, _ = load_data.load_xy(train_mod, model='hist_buildings')
+    X, Y, _, _ = data_loader.load_data(train_mod, ref_std='hist_buildings')
     X = X[:, :2]
     houses = Y != 0
     X_train = X[houses]

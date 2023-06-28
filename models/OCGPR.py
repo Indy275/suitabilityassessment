@@ -1,7 +1,7 @@
 import configparser
 import numpy as np
 
-from data_util import load_data
+from data_util import data_loader
 from plotting import plot
 
 from sklearn.neighbors import NearestNeighbors
@@ -167,8 +167,8 @@ class OCGP():
 
 
 def run_model(train_mod, test_mod, train_size, test_size):
-    X_train, y_train, _, _ = load_data.load_xy(train_mod, model='hist_buildings')
-    X_test, y_test, _, _ = load_data.load_xy(test_mod, model='hist_buildings')
+    X_train, y_train, _, _ = data_loader.load_data(train_mod, ref_std='hist_buildings')
+    X_test, y_test, _, _ = data_loader.load_data(test_mod, ref_std='hist_buildings')
 
     n_feats = 7
     X = X_train[:, -n_feats:]
@@ -187,8 +187,8 @@ def run_model(train_mod, test_mod, train_size, test_size):
     y_train = y_train
 
     if plot_data:
-        bg_train = load_data.load_bg(train_mod)
-        bg_test = load_data.load_bg(test_mod)
+        bg_train = data_loader.load_bg(train_mod)
+        bg_test = data_loader.load_bg(test_mod)
         plot.plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size)
 
     kernel, v, N, svar, ls, p = set_hypers()
@@ -217,7 +217,7 @@ def run_model(train_mod, test_mod, train_size, test_size):
     X2 = X_test[:, 0]
     cmap = plot.set_colmap()
     cmap.set_bad('tab:blue')
-    bg = load_data.load_bg(test_mod)
+    bg = data_loader.load_bg(test_mod)
     for i in range(len(modes)):
         score = np.array(ocgp.getGPRscore(modes[i]))
         ax = plt.subplot(2, 2, i + 1)

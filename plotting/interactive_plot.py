@@ -5,7 +5,7 @@ import configparser
 import numpy as np
 import pandas as pd
 
-from data_util import load_data
+from data_util import data_loader
 
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, ctx
@@ -31,7 +31,7 @@ class DashApp():
                 weights_init = weights_init['importance']
         else:
             weights_init = np.repeat([1], 5)
-        unweighted_df, df_orig, col_names = load_data.load_xy(modifier)
+        unweighted_df, df_orig, col_names = data_loader.load_data(modifier)
         unweighted_df = unweighted_df[:, 2:]
         col_names = col_names[2:-1]
         unweighted_df[np.isnan(unweighted_df)] = 0

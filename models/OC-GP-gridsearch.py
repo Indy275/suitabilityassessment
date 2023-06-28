@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
 from sklearn.model_selection import GridSearchCV
 
-from data_util import load_data
+from data_util import data_loader
 from plotting import plot
 
 import configparser
@@ -171,10 +171,10 @@ class OCGP():
         return x, y
 
 
-def run_model(train_mod, test_mod, train_w, train_h, test_w, test_h):
+def run_model(train_mod, test_mod, train_size, test_size):
     kernel, v, N, svar, ls, p = set_params()
-    X, Y, _, _ = load_data.load_xy(train_mod, model='hist_buildings')
-    X_test, y_test, _, _ = load_data.load_xy(test_mod, model='hist_buildings')
+    X, Y, _, _ = data_loader.load_data(train_mod, ref_std='hist_buildings')
+    X_test, y_test, _, _ = data_loader.load_data(test_mod, ref_std='hist_buildings')
 
     n_feats = 7
     X = X[:, -n_feats:]
@@ -193,9 +193,9 @@ def run_model(train_mod, test_mod, train_w, train_h, test_w, test_h):
     y_train = Y
 
     if plot_data:
-        bg_train = load_data.load_bg(train_mod)
-        bg_test = load_data.load_bg(test_mod)
-        plot.plot_y(y_train, y_test, bg_train, bg_test, train_w, train_h, test_w, test_h)
+        bg_train = data_loader.load_bg(train_mod)
+        bg_test = data_loader.load_bg(test_mod)
+        plot.plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size)
 
     param_grid = {'v': [0.8, 0.4, 1.2],
                   'N': [4, 2, 8],

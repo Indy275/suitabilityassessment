@@ -15,7 +15,7 @@ data_url = config['DEFAULT']['data_url']
 
 
 def load_xy(modifier, model=None):
-    if not model:
+    if not model:  # no model means labels are not used; open expert_ref arbitrarily as labels are dropped anyway
         ref_std = 'expert_ref'
     else:
         ref_std = model
@@ -42,25 +42,13 @@ def load_xy(modifier, model=None):
     return np.array(X), np.array(y), np.array(df_orig), col_names
 
 
-def load_bg(modifier):
-    bg_png = data_url + '/' + modifier + '/bg_downscaled' + '.png'
-    if Path(bg_png).is_file():
-        # with rasterio.open(bg_tiff) as f:  # Write raster data to disk
-        #     bg = f.read(1)
-        bg = mpimg.imread(bg_png)
-    else:
-        bg = np.zeros((10, 10))
-        bg += 1e-4
-    return bg
-
-
-def flatten(l):
-    l2 = [([x] if isinstance(x, str) else x) for x in l]
-    return list(itertools.chain(*l2))
-
-
 def load_expert(modifier):
     X, y = [], []
+
+    def flatten(l):
+        l2 = [([x] if isinstance(x, str) else x) for x in l]
+        return list(itertools.chain(*l2))
+
     with open(data_url + '/expertscores_{}.csv'.format(modifier), 'r') as scores_f, open(
             data_url + '/expert_point_info_{}.csv'.format(modifier), 'r') as info_f:
         scores_reader = csv.reader(scores_f)
@@ -85,16 +73,40 @@ def load_expert_all(modifier):
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32), point_info_scores.columns[2:]
 
 
-def transform_expert(mod):
-    if mod[-3:] == 'all':
-        X, y, col_names = load_expert_all(mod)
+# def transform_expert(mod):
+#     if mod[-3:] == 'all':
+#         X, y, col_names = load_expert_all(mod)
+#     else:
+#         X, y, col_names = load_expert(mod)
+#
+#     X_feats = X[:, 2:7]
+#     X_loc_feats = X
+#
+#     return X, X_loc_feats, y, col_names
+
+
+def load_data(mod, ref_std=None):
+    if ref_std == 'expert_ref' and mod.lower() in ['oc', 'ocall', 'ws', 'wsall']:  # Model is expert ref and test labels are available
+        if mod[-3:] == 'all':
+            X, y, col_names = load_expert_all(mod)
+        else:
+            X, y, col_names = load_expert(mod)
+        X_feats = X[:, 2:7]
+        X_loc_feats = X
+        return X_feats, X_loc_feats, y, col_names
+    elif ref_std == 'hist_buildings' and mod.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:  # Model is hist_buildings and test labels are available
+        return load_xy(mod, model=ref_std)
+    else:  # No labels are used, so arbitrarily take expert ref data since labels are dropped anyway
+        return load_xy(mod)
+
+
+def load_bg(modifier):
+    bg_png = data_url + '/' + modifier + '/bg_downscaled' + '.png'
+    if Path(bg_png).is_file():
+        # with rasterio.open(bg_tiff) as f:  # Write raster data to disk
+        #     bg = f.read(1)
+        bg = mpimg.imread(bg_png)
     else:
-        X, y, col_names = load_expert(mod)
-
-    X_feats = X[:, 2:7]
-    # X_feats = X_feats[:, :2] # Use only lat,lon
-    X_loc_feats = X
-
-    # X = torch.tensor(X_feats).float()
-    # y = torch.tensor(y).float()
-    return X, X_loc_feats, y, col_names
+        bg = np.zeros((10, 10))
+        bg += 1e-4
+    return bg

@@ -3,7 +3,7 @@ import configparser
 import numpy as np
 import pandas as pd
 
-from data_util import load_data
+from data_util import data_loader
 from plotting import plot
 
 from sklearn.metrics import mean_squared_error
@@ -92,8 +92,8 @@ def train_predict(X_train, y_train, X_test, y_test, test_h, model, train_mod, te
 
 
 def run_model(train_mod, test_mod, model, train_size, test_size, ref_std):
-    X_train, y_train, X_train_orig, train_col_names = load_data.load_xy(train_mod, ref_std)
-    X_test, y_test, X_test_orig, test_col_names = load_data.load_xy(test_mod, ref_std)
+    X_train, y_train, X_train_orig, train_col_names = data_loader.load_data(train_mod, ref_std)
+    X_test, y_test, X_test_orig, test_col_names = data_loader.load_data(test_mod, ref_std)
     assert train_col_names == test_col_names
 
     if plot_data:
@@ -105,8 +105,8 @@ def run_model(train_mod, test_mod, model, train_size, test_size, ref_std):
         # print("Test labels:", y_test.shape, pd.DataFrame(y_test).describe())
         # print("Of the test samples, {} are positive ({}%)".format(sum(y_test), sum(y_test) / len(y_test) * 100))
 
-        bg_train = load_data.load_bg(train_mod)
-        bg_test = load_data.load_bg(test_mod)
+        bg_train = data_loader.load_bg(train_mod)
+        bg_test = data_loader.load_bg(test_mod)
         plot.plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size)
 
     train_predict(X_train, y_train, X_test, y_test, test_size, model, train_mod, test_mod, test_col_names,

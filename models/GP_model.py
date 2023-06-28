@@ -1,7 +1,7 @@
 import configparser
 import numpy as np
 
-from data_util import load_data
+from data_util import data_loader
 from plotting import plot
 
 import torch
@@ -76,13 +76,13 @@ def train(train_x, train_y, model, likelihood, num_steps=500, lr=0.01):
 
 
 def run_model(train_mod, test_mod, test_h):
-    X_train, X_train_loc_feats, y_train, col_names = load_data.transform_expert(train_mod)
+    X_train, X_train_loc_feats, y_train, col_names = data_loader.load_data(train_mod, ref_std='expert_ref')
     n_feats = X_train.shape[-1]
     if test_mod.lower() in ['oc', 'ws']:  # This only directly makes sense for error quantification
-        X_test, X_test_loc_feats, y_test, col_names = load_data.transform_expert(test_mod)
+        X_test, X_test_loc_feats, y_test, _ = data_loader.load_data(test_mod, ref_std='expert_ref')
         test_nans = np.isnan(X_test).any(axis=1)  # no nans will occur, just so that python doesn't complain
     else:  # Else just use an area to make a plot
-        X_test, _, _ = load_data.load_xy(test_mod)
+        X_test, _, _ = data_loader.load_data(test_mod)
         X_test_loc_feats = np.copy(X_test)
         test_nans = np.isnan(X_test).any(axis=1)
         X_test = X_test[~test_nans]
@@ -141,7 +141,7 @@ def run_model(train_mod, test_mod, test_h):
 
         plt.subplots()
         cmap = plot.set_colmap()
-        bg = load_data.load_bg(test_mod)
+        bg = data_loader.load_bg(test_mod)
         # x0, x1, y0, y1 = y_preds[:, 0][0], y_preds[:, 0][test_h - 1], y_preds[:, 1][0], y_preds[:, 1][-1]
         plt.imshow(bg, extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], origin='upper')
         plt.gca().set_facecolor("tab:blue")
