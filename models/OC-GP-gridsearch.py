@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
+from sklearn.model_selection import GridSearchCV
 
 from data_util import load_data
 from plotting import plot
@@ -19,17 +20,17 @@ plot_pred = int(config['PLOTTING']['plot_pred'])
 
 
 def set_params():
-    kernel = 'se'
-    v = 0.8
-    N = 4
-    svar = 0.0045
-    ls = 2
-    p = 30
+    kernel = 'scaled'  # scaled adaptive se
+    v = 1.0  # scaled   0.8
+    N = 3  # scaled     4
+    svar = 0.0045  # 0.0045
+    ls = 2  # se        2
+    p = 30  # adaptive  30
     return kernel, v, N, svar, ls, p
 
 
 class OCGP():
-
+    # https://github.com/AntonioDeFalco/Adaptive-OCGP
     def __init__(self):
         self.K = []
         self.Ks = []
@@ -196,9 +197,22 @@ def run_model(train_mod, test_mod, train_w, train_h, test_w, test_h):
         bg_test = load_data.load_bg(test_mod)
         plot.plot_y(y_train, y_test, bg_train, bg_test, train_w, train_h, test_w, test_h)
 
-    ocgp = OCGP()
+    param_grid = {'v': [0.8, 0.4, 1.2],
+                  'N': [4, 2, 8],
+                  'svar': [0.0045, 0.001, 0.01],
+                  'ls': [2, 1, 1/2],
+                  'p': [30, 15, 50]}
 
-    # if test_w > 400:
+    for key in param_grid:
+        for i in range(3):
+            v = param_grid['v'][0]
+            N = param_grid['N'][0]
+            svar = param_grid['svar'][0]
+            ls = param_grid['ls'][0]
+            p = param_grid['p'][0]
+
+
+        ocgp = OCGP()
 
     if kernel == "se":
         ocgp.seKernel(X_train, X_test, ls, svar)
@@ -221,9 +235,10 @@ def run_model(train_mod, test_mod, train_w, train_h, test_w, test_h):
     for i in range(len(modes)):
         score = np.array(ocgp.getGPRscore(modes[i]))
         ax = plt.subplot(2, 2, i + 1)
+        plot.set_colmap()
         img = plt.imshow(score.reshape((test_h, test_w)), vmin=np.nanmin(score),
-                        vmax=np.nanmax(score), extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], aspect='auto')
-        plot.set_colmap(img)
+                         vmax=np.nanmax(score), extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], aspect='auto')
+        img.cmap.set_bad('tab:blue')
 
         print(modes[i], np.nanmin(score), np.nanmax(score))
         ax.set_title(titles[i])

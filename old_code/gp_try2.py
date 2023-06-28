@@ -48,7 +48,7 @@ def train(gpr, num_steps=2000):
 
 def run_model(train_mod, test_mod, test_w, test_h):
     noise = config.getfloat('MODEL_PARAMS', 'noise')
-    X_train, y_train = load_data.load_expert(train_mod)
+    X_train, y_train, _, _ = load_data.load_expert(train_mod)
     # X_train = X_train[:, 2:7]
     X_train = X_train[:, :2] # Use only lat,lon
     X = torch.tensor(X_train)

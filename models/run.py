@@ -1,19 +1,17 @@
-from models import ml1_traintest, gp_model, GPyOCC, gp_try3, OCC_GPR2
-from old_code import gpb2
+from models import baseline_model, GP_model, OCGPR
+from old_code import GPyOCC, gp_model
 
 
-def run_model(train_mod, test_mod, model, train_w, train_h, test_w, test_h, ref_std):
-    if model == 'gpb':
-        gpb2.run_model(train_mod, train_w, train_h, ref_std)
-    elif model == 'gpold':
+def run_model(train_mod, test_mod, model, train_size, test_size, ref_std):
+    if model == 'gpold':
         if ref_std == 'hist_buildings':
-            GPyOCC.run_model(train_mod, test_mod, train_w, train_h, test_w, test_h)
+            GPyOCC.run_model(train_mod, test_mod, train_size, test_size)
         else:  # expert_ref
             gp_model.run_model(train_mod, ref_std)
     elif model == 'gpnew':
         if ref_std == 'hist_buildings':
-            OCC_GPR2.run_model(train_mod, test_mod, train_w, train_h, test_w, test_h)
+            OCGPR.run_model(train_mod, test_mod, train_size, test_size)
         else:  # expert_ref
-            gp_try3.run_model(train_mod, test_mod, test_w, test_h)
+            GP_model.run_model(train_mod, test_mod, test_size)
     else:
-        ml1_traintest.run_model(train_mod, test_mod, model, train_w, train_h, test_w, test_h, ref_std)
+        baseline_model.run_model(train_mod, test_mod, model, train_size, test_size, ref_std)
