@@ -4,6 +4,7 @@ import configparser
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from data_analysis import ahp_util
 
@@ -35,7 +36,6 @@ print("min mean max consistency:", np.min(consistency_ratio),np.mean(consistency
 dura = np.array(duration)/60
 print(np.array(duration)/60)
 dura = dura[dura<100]
-print(list(zip(np.array(duration)/60, consistency_ratio)))
 print("min mean max duration:", np.min(dura),np.mean(dura),np.max(dura))
 
 location_gm = ahp_util.compute_priority_weights_aggregate(matrix)
@@ -56,3 +56,11 @@ dp, X, Y = ahp_util.read_dp_csv(cluster)
 #     for p, x, y, mean, std in zip(dp, X, Y, location_gm, location_std):
 #         f.write("%s,%s,%s,%s,%s\n" % (p, x, y, mean, std))
 
+ratio2 = [(0.41913123688450415+0j), (0.2814425675943259+0j), (0.5795550347978271+0j), (0.1447406877493689+0j), (0.6756547403936265+0j), (0.14944429913930798+0j), (0.2809649680632276+0j), (0.24101441674116333+0j), (0.19959397671736384+0j), (0.21996983966116834+0j), (0.5079029065848542+0j), (0.12372896167266693+0j)]
+plt.boxplot([ratio2, consistency_ratio])
+labels = ['WS', 'OC']
+plt.xticks(ticks=range(1, len(labels) + 1), labels=labels)
+plt.ylim([0,1])
+left, right = plt.xlim()
+plt.hlines(y=0.1, xmin=left, xmax=right, linestyles='dashed', colors=['red'])
+plt.show()

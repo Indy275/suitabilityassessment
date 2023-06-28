@@ -21,7 +21,7 @@ def build_matrix(data):
     col_idx = [1, 2, 3, 4, 2, 3, 4, 3, 4, 4]
     row_idx = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3]
     val_idx = [0, 7, 5, 3, 1, 3, 5, 7]
-    for i, expert in enumerate(data.itertuples()):
+    for i, expert in enumerate(data.itertuples()):  # loop over expert comparison matrices
         for j, comp in enumerate(data.columns[-10:]):
             c = col_idx[j]
             r = row_idx[j]
@@ -29,7 +29,7 @@ def build_matrix(data):
             if value < 4:  # A more suitable
                 matrix[i, r, c] = val_idx[value]
                 matrix[i, c, r] = 1 / val_idx[value]
-            elif value > 4:
+            elif value > 4:   # B more suitable
                 matrix[i, r, c] = 1 / val_idx[value]
                 matrix[i, c, r] = val_idx[value]
             else:  # value == 4 -> equally suitable
@@ -81,8 +81,8 @@ def compute_priority_weights_aggregate(matrix):
 
 
 def read_dp_csv(cluster):
-    df = pd.read_csv(data_url + "/expert_points_{}.csv".format(cluster))
-    return df['point'], df['X'], df['Y']
+    df = pd.read_csv(data_url + "/expertscores_{}.csv".format(cluster))
+    return df['Point'], df['X'], df['Y']
 
 
 def read_survey_data(name, date):

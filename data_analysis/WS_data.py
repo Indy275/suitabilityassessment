@@ -46,12 +46,11 @@ for index, expert in data.iterrows():
 
 print("Number of participants that completed survey:",n_completed_surveys)
 print("min mean max consistency:", np.min(consistency_ratio),np.mean(consistency_ratio),np.max(consistency_ratio))
+print("constratio", consistency_ratio)
 print(np.array(duration)/60)
 dura = np.array(duration)/60
 dura = dura[dura<100]
 print("min mean max duration:", np.min(dura),np.mean(dura),np.max(dura))
-print(list(zip(np.array(duration)/60, consistency_ratio)))
-
 
 mean_weight = weights.replace(0, np.NaN).mean(axis=0).replace(np.NaN,0)
 # TODO: replace with geometric mean to follow Saaty's AHP
