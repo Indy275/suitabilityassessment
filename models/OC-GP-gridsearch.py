@@ -172,12 +172,11 @@ class OCGP():
 
 
 def run_model(train_mod, test_mod, train_size, test_size):
-    kernel, v, N, svar, ls, p = set_params()
-    X, Y, _, _ = data_loader.load_data(train_mod, ref_std='hist_buildings')
-    X_test, y_test, _, _ = data_loader.load_data(test_mod, ref_std='hist_buildings')
+    X_train, y_train, _, _ = data_loader.load_xy(train_mod, model='hist_buildings')
+    X_test, y_test, _, _ = data_loader.load_x(test_mod)
 
     n_feats = 7
-    X = X[:, -n_feats:]
+    X = X_train[:, -n_feats:]
 
     # width, height = 40, 40
     # X = X.reshape((width, height, n_feats))
@@ -188,14 +187,14 @@ def run_model(train_mod, test_mod, train_size, test_size):
     # X = X.reshape((width*height, n_feats))
     # Y = Y.reshape((width*height,))
 
-    train_vals = Y != 0
+    train_vals = y_train != 0
     X_train = X[train_vals]
-    y_train = Y
+    y_train = y_train
 
     if plot_data:
         bg_train = data_loader.load_bg(train_mod)
         bg_test = data_loader.load_bg(test_mod)
-        plot.plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size)
+        plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
 
     param_grid = {'v': [0.8, 0.4, 1.2],
                   'N': [4, 2, 8],

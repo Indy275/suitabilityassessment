@@ -32,11 +32,11 @@ def plot_row(y, bg, y_t, ax, i, h, w):
     ax[i].yaxis.set_ticklabels([])
 
 
-def plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size):
+def plot_y(y_train, bg_train, bg_test, train_size, test_size):
     fig, ax = plt.subplots(1, 2)
 
     bg = [bg_train, bg_test]
-    y = [y_train, y_test]
+    y = [y_train, y_train]  # y_test is usually not available and will not be plotted anyway
     y_t = ['Train', 'Test']
     height = [train_size, test_size]
     width = [train_size, test_size]

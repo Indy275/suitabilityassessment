@@ -167,8 +167,8 @@ class OCGP():
 
 
 def run_model(train_mod, test_mod, train_size, test_size):
-    X_train, y_train, _, _ = data_loader.load_data(train_mod, ref_std='hist_buildings')
-    X_test, y_test, _, _ = data_loader.load_data(test_mod, ref_std='hist_buildings')
+    X_train, y_train, _ = data_loader.load_xy(train_mod, model='hist_buildings')
+    X_test, _ = data_loader.load_x(test_mod)
 
     n_feats = 7
     X = X_train[:, -n_feats:]
@@ -189,7 +189,7 @@ def run_model(train_mod, test_mod, train_size, test_size):
     if plot_data:
         bg_train = data_loader.load_bg(train_mod)
         bg_test = data_loader.load_bg(test_mod)
-        plot.plot_y(y_train, y_test, bg_train, bg_test, train_size, test_size)
+        plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
 
     kernel, v, N, svar, ls, p = set_hypers()
     ocgp = OCGP()

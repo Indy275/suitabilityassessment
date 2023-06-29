@@ -31,15 +31,13 @@ class DashApp():
                 weights_init = weights_init['importance']
         else:
             weights_init = np.repeat([1], 5)
-        unweighted_df, df_orig, col_names = data_loader.load_data(modifier)
+        unweighted_df, col_names = data_loader.load_x(modifier)
+        df_orig, col_names = data_loader.load_orig_df(modifier)
+
         unweighted_df = unweighted_df[:, 2:]
         col_names = col_names[2:-1]
         unweighted_df[np.isnan(unweighted_df)] = 0
         df_orig[np.isnan(df_orig)] = 0
-
-        # nan_df, _, _ = load_data.load_xy(modifier)
-        # nan_df = nan_df[:, -1]
-        # nan_df = np.array(nan_df).reshape((-1, 1))
 
         feature0 = df_orig[:, 0].reshape((size, size))
         feature1 = df_orig[:, 1].reshape((size, size))

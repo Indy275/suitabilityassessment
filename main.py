@@ -1,6 +1,7 @@
 from data_util import create_data
 from plotting.interactive_plot import DashApp
 from plotting import kde_plot
+from util import geospatial
 from models import run
 
 import configparser
@@ -20,13 +21,17 @@ data_url = config['DEFAULT']['data_url']
 bbox = {'schermerbeemster': '4.78729, 52.59679, 4.88033, 52.53982',
         'purmer': '5.04805, 52.52374, 4.93269, 52.46846',
         'purmerend': '4.90, 52.4800, 4.96284, 52.51857',
-        'noordholland': '4.51813, 52.45099, 5.2803, 52.96078',
-        'NH_HiRes': '4.51813, 52.45099, 5.2803, 52.96078',
+        # 'noordholland': '4.51813, 52.45099, 5.2803, 52.96078',
+        # 'noordhollandHR': '4.51813, 52.45099, 5.2803, 52.96078',
         'volendam': '5.0168, 52.51664, 5.0853, 52.48006',
         'oc': '4.8998, 52.4769, 5.0386, 52.5355',
         'ocall': '4.8998, 52.4769, 5.0386, 52.5355',
         'ws': '4.8281, 52.5892, 5.0457, 52.714',
         'wsall': '4.8281, 52.5892, 5.0457, 52.714'}
+
+HHNKbbox = geospatial.get_hhnk_bbox()
+bbox['noordholland'] = HHNKbbox
+bbox['noordhollandHR'] = HHNKbbox
 
 train_bbox = [float(i[0:-1]) for i in bbox[train_mod].split()]
 test_bbox = [float(i[0:-1]) for i in bbox[test_mod].split()]
@@ -48,7 +53,7 @@ if create_new_data:
     print("Creating data frame for {}".format(train_mod))
     create_data.create_df(train_mod, train_bbox, train_size, ref_std)
     print("Creating data frame for {}".format(test_mod))
-    create_data.create_df(test_mod, test_bbox, test_size, ref_std)
+    create_data.create_df(test_mod, test_bbox, test_size, ref_std, test=True)
 
 if run_models:
     print("Running {}-model with {} for {} and {}".format(ml_model, ref_std, train_mod, test_mod))

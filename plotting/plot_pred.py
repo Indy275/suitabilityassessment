@@ -26,7 +26,7 @@ def plot_f_importances(coef, names):
     plt.show()
 
 
-def plot_prediction(y_pred, height, figname, digitize_pred=False, sigmoid_pred=False, ax=None):
+def plot_prediction(y_pred, height, figname, digitize_pred=False, sigmoid_pred=False, ax=None, bg=None):
     X1 = y_pred[:, 0]
     X2 = y_pred[:, 1]
     y_pred = y_pred[:, 2]
@@ -45,11 +45,32 @@ def plot_prediction(y_pred, height, figname, digitize_pred=False, sigmoid_pred=F
     if ax is None:
         fig, ax = plt.subplots()
     set_colmap()
-    img = ax.imshow(y_pred.reshape((height, -1)), vmin=np.nanmin(y_pred), vmax=np.nanmax(y_pred),
+    img = ax.imshow(bg, extent=[np.nanmin(X2), np.nanmax(X2), np.nanmin(X1), np.nanmax(X1)], origin='upper')
+
+    plt.imshow(y_pred.reshape((height, -1)), vmin=np.nanmin(y_pred), vmax=np.nanmax(y_pred), alpha=0.65,
                     extent=[np.nanmin(X2), np.nanmax(X2), np.nanmin(X1), np.nanmax(X1)], aspect='auto')
     img.cmap.set_bad('tab:blue')
 
     plt.savefig(figname)
+    plt.show()
+
+
+def plot_contour(y_preds, test_size, fig_name, bg=None):
+    X1 = y_preds[:, 1]
+    X2 = y_preds[:, 0]
+
+    plt.subplots()
+    cmap = set_colmap()
+    plt.imshow(bg, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper')
+    plt.gca().set_facecolor("tab:blue")
+    plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
+                 cmap=cmap, origin='upper', alpha=0.65)  # Plot the mean function as a filled contour
+    plt.contour(X1[:test_size], X2[::test_size], y_preds[:, 3].reshape((test_size, test_size)),
+                levels=[1.96, 2.58], colors='black', linewidths=0.5, origin='upper', alpha=0.65)
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+
+    plt.savefig(fig_name, bbox_inches='tight')
     plt.show()
 
 

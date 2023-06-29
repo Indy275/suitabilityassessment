@@ -79,96 +79,57 @@ def get_raster_data(raster_url, modifier, name, bbox, size):
     return np.squeeze(data)
 
 
-def get_labels(model, modifier, name, copy):
+def get_labels(model, modifier, copy):
     """
-    Retrieve label data from .tiff
+    Get target labels, either from expert judgement or historic buildings.
+    Open .tiff-file with labels if existing, otherwise create the file first.
 
     :param model: str, 'expert_ref' or 'hist_buildings'
-    :param name: name of the model, equal to model
+    :param modifier:
     :param copy: layer data for feature burning
     :return: labels
     """
-    geotiff_name = data_url + '/rasters/' + modifier + '/' + name + '.tiff'
-    if model == 'expert_ref' and modifier.lower() in ['oc', 'ws']:
-        if (not Path(geotiff_name).is_file()) or recreate_labs:
-            print("(Re)creating layer {}.tiff.; retrieving expert scores".format(name))
-            # if modifier.lower() == 'oc':
-            #     dp_url = 'https://hhnk.lizard.net/api/v4/favourites/89c4db99-7a1a-4aa1-8abc-f89133d20d63/'
-            # else: # modifier == ws
-            #     dp_url = 'https://hhnk.lizard.net/api/v4/favourites/917100d2-7e3f-430f-a9d5-1fb42f5bb7d0/'
-            # r = requests.get(url=dp_url, headers=json_headers)
-            # data = r.json()['state']
+    geotiff_name = data_url + '/rasters/' + modifier + '/' + model + '.tiff'
+    if (not Path(geotiff_name).is_file()) or recreate_labs:  # if it doesn't yet exist, or if we want to recreate anyway
+        print(f'(Re)creating layer; retrieving {model} labels')
 
-            # json_url = data_url + '/datapoints_{}.json'.format(modifier)
-            # if not Path(json_url).is_file():
-            #     with open(json_url, 'w') as f:
-            #         json.dump(data['geometries'], f)
-            #
-            # with open(json_url, 'r') as f:
-            #     points = json.load(f)
-
-            # scores = []
-            # with open(data_url + '/expertscores_{}.csv'.format(modifier), 'r') as f:
-            #     csvreader = csv.reader(f)
-            #     next(csvreader)
-            #     for row in csvreader:
-            #         scores.append(float(row[3]))  # Mean
-            #         # scores.append(float(row[4]))  # Std
-            # gdf = gpd.GeoDataFrame.from_features(points, columns=['geometry', 'score'])
-            # gdf['value'] = np.array(scores).flatten()
-            #
-            # print("gdf",gdf.columns, gdf)
+        if model == 'expert_ref' and modifier.lower() in ['oc', 'ws']:
             df = pd.read_csv(data_url + '/expertscores_{}.csv'.format(modifier), header=[0])
-            gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.X, df.Y))
-            # shapes = [(geom, int(value)) for geom, value in zip(gdf['geometry'], gdf['value'])]
-            # shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['value'])]
-            shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['Mean'])]
+            gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.Lng, df.Lat))
+            shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['Value'])]
 
-            copy_fn = data_url + '/rasters/' + modifier + '/' + copy + '.tiff'
-            copy_f = rasterio.open(copy_fn)
-            meta = copy_f.meta.copy()
-            meta.update(compress='lzw')
-            with rasterio.open(geotiff_name, 'w+', **meta) as out:
-                out_arr = out.read(1)
-                burned = features.rasterize(shapes=shapes, out=out_arr, transform=out.transform, fill=0)
-                out.write_band(1, burned)
-    elif model == 'hist_buildings' and modifier.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:
-        if (not Path(geotiff_name).is_file()) or recreate_labs:
-            print("No saved .tiff found for layer {}; retrieving data".format(name))
-
+        elif model == 'hist_buildings' and modifier.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:
             gdf = gpd.read_file(data_url + "/waterland1900min.shp")
             gdf.to_crs(crs='EPSG:4326', inplace=True)
             gdf['value'] = 1
             shapes = ((geom, value) for geom, value in zip(gdf['geometry'], gdf['value']))
+        else:
+            print(f'There was an incompatibility issue: {model=} {modifier=}')
 
-            copy_fn = data_url + '/rasters/' + modifier + '/' + copy + '.tiff'
-            copy_f = rasterio.open(copy_fn)
-            meta = copy_f.meta.copy()
-            meta.update(compress='lzw')
-
-            with rasterio.open(geotiff_name, 'w+', **meta) as out:
-                out_arr = out.read(1)
-                burned = features.rasterize(shapes=shapes, out=out_arr, transform=out.transform, fill=0)
-                out.write_band(1, burned)
-    else:  # Data is used for testing and does not have associated labels: copy a random layer
         copy_fn = data_url + '/rasters/' + modifier + '/' + copy + '.tiff'
-        print(copy_fn, geotiff_name)
-        shutil.copyfile(copy_fn, geotiff_name)
+        copy_f = rasterio.open(copy_fn)
+        meta = copy_f.meta.copy()
+        meta.update(compress='lzw')
+
+        with rasterio.open(geotiff_name, 'w+', **meta) as out:
+            out_arr = out.read(1)
+            burned = features.rasterize(shapes=shapes, out=out_arr, transform=out.transform, fill=0)
+            out.write_band(1, burned)
 
     with rasterio.open(geotiff_name) as f:  # Read raster data from disk
         data = f.read(1)
 
-    return np.squeeze(data)
+    return np.array(np.squeeze(data))
 
 
-def get_fav_data(modifier, model, bbox, size):
+def get_fav_data(modifier, model, bbox, size, test):
     fav_url = "https://hhnk.lizard.net/api/v4/favourites/97ffd069-1da0-43f3-964e-cdded4a8565b/"
     r = requests.get(url=fav_url, headers=json_headers)
     data = r.json()['state']
-    lon = np.linspace(min([bbox[0], bbox[2]]), max([bbox[0], bbox[2]]), size)
+    lng = np.linspace(min([bbox[0], bbox[2]]), max([bbox[0], bbox[2]]), size)
     lat = np.linspace(max([bbox[1], bbox[3]]), min([bbox[1], bbox[3]]), size)
-    Y, X = np.meshgrid(lon, lat)  # This intentionally swapped: numpy
-    col_names, combined_sources = ['lon', 'lat'], [X, Y]
+    Y, X = np.meshgrid(lng, lat)  # This intentionally swapped: numpy
+    col_names, combined_sources = ['Lng', 'Lat'], [X, Y]
     for layer in data['layers']:
         raster_url = "https://hhnk.lizard.net/api/v4/rasters/{}".format(layer['uuid'])
         col_names.append(layer['name'].strip())
@@ -176,21 +137,23 @@ def get_fav_data(modifier, model, bbox, size):
         layerdata = np.array(get_raster_data(raster_url, modifier, layer['name'], bbox, size))
         combined_sources.append(layerdata)
 
-    label_data = np.array(
-        get_labels(model, modifier, name=model, copy=col_names[-2]))
+    if not test:
+        label_data = get_labels(model, modifier, copy=col_names[-2])
+    else:  # test data -> no labels
+        label_data = np.zeros((size,size))
 
     combined_sources.append(label_data)
     col_names.append(model.strip())
     return np.array(combined_sources), col_names
 
 
-def create_df(modifier, bbox, size, model):
+def create_df(modifier, bbox, size, model, test=False):
     if not os.path.exists(data_url + '/' + modifier):
         os.makedirs(data_url + '/' + modifier)
         os.makedirs(data_url + '/rasters/' + modifier)
 
     # Retrieve layer data based on a favourite instance
-    extracted_data, col_names = get_fav_data(modifier, model, bbox, size)
+    extracted_data, col_names = get_fav_data(modifier, model, bbox, size, test=test)
 
     # NaN values are explicitly set to NaN instead of -9999
     extracted_data[extracted_data < -9000] = np.nan
@@ -214,6 +177,10 @@ def create_df(modifier, bbox, size, model):
         mask = zscore(df[column], nan_policy='omit') > 3
         df.loc[mask, column] = threshold
 
-    df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
+    if not test:
+        df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
+    else:
+        df.to_csv(data_url + '/' + modifier + "/testdata.csv", index=False)
+
     dump(ss, data_url + '/' + modifier + "/scaler.joblib")
     print("Data with shape {} saved to {}.csv".format(extracted.shape, modifier))
