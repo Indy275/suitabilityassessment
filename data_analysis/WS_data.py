@@ -59,6 +59,6 @@ mean_std = weights.replace(0, np.NaN).std(axis=0).replace(np.NaN,0)
 dp, X, Y = ahp_util.read_dp_csv(cluster)
 
 with open(data_url + "/expertscores_{}.csv".format(cluster), 'w') as f:
-    f.write("Point,X,Y,Mean,Std\n")
+    f.write("Point,Lng,Lat,Value,Std\n")
     for p, x, y, mean, std in zip(dp, X, Y, mean_weight, mean_std):
         f.write("%s,%s,%s,%s,%s\n" % (p, x, y, mean, std))

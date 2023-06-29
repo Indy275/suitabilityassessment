@@ -38,12 +38,12 @@ for index, expert in data.iterrows():
               "(CR: {})".format(ahp_util.compute_consistency_ratio(np.squeeze(matrix))))
 
 dp, X, Y = ahp_util.read_dp_csv(cluster)
-point_data = pd.DataFrame({'Point': dp, 'X': X, 'Y': Y})
+point_data = pd.DataFrame({'Point': dp, 'Lng': X, 'Lat': Y})
 
 print(datapoints, dp, X, Y)
 weights = pd.DataFrame({'Point': datapoints, 'Value': weights_dp})
 weights = weights.merge(point_data, on='Point', how='left')
-weights = weights[['Point', 'X', 'Y', 'Value']]
+weights = weights[['Point', 'Lng', 'Lat', 'Value']]
 weights.sort_values(by='Point', inplace=True)
 
 weights.to_csv(data_url + "/expertscoresall_{}.csv".format(cluster), index=False)
