@@ -25,34 +25,39 @@ def load_orig_df(mod):
     return df_orig, col_names
 
 
-def load_histbld(modifier):
-    df = pd.read_csv(data_url + '/' + modifier + '/hist_buildings.csv')
-    col_names = list(df.columns)
-    df = df.to_numpy()
-    X = df[:, :-1]
-
-    y = df[:, -1]
-    y[y < 0] = 0
-    y[y > 0] = 1
-    y = np.where(np.isnan(y), 0, y)  # No house is built on NaN cells
-
-    return np.array(X), np.array(y), col_names[:-1]
-
-
-def load_expert(modifier, all):
-    if all:
-        all_exp_scores = pd.read_csv(data_url + f'/expertscoresall_{modifier}.csv', header=[0])
-    else:
-        all_exp_scores = pd.read_csv(data_url + f'/expertscores_{modifier}.csv', header=[0])
-    exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
-    point_info_scores = all_exp_scores.merge(exp_point_info, on='Point', how='left',
-                                             suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
-    y = point_info_scores['Value']
-    point_info_scores.drop(['Value', 'Std', 'Point', 'Unnamed: 0'], axis=1, inplace=True, errors='ignore')
-    X = point_info_scores
-    col_names = list(point_info_scores.columns)
-
-    return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32), col_names
+# def load_histbld(modifier, model):
+#     df = pd.read_csv(data_url + '/' + modifier + '/' + model + '.csv')
+#     col_names = list(df.columns)
+#     df = df.to_numpy()
+#     X = df[:, :-1]
+#
+#     y = df[:, -1]
+#
+#     if model == 'hist_buildings':
+#         y[y < 0] = 0
+#         y[y > 0] = 1
+#     y = np.where(np.isnan(y), 0, y)  # No house is built on NaN cells
+#
+#     return np.array(X), np.array(y), col_names[:-1]
+#
+#
+# def load_expert(modifier, all):
+#     df = pd.read_csv(data_url + '/' + modifier + "/expert_ref.csv", header=[0])
+#     col_names = list(df.columns)
+#
+#     if all:
+#         all_exp_scores = pd.read_csv(data_url + f'/expertscoresall_{modifier}.csv', header=[0])
+#     else:
+#         all_exp_scores = pd.read_csv(data_url + f'/expertscores_{modifier}.csv', header=[0])
+#     exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
+#     point_info_scores = all_exp_scores.merge(exp_point_info, on='Point', how='left',
+#                                              suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
+#     y = point_info_scores['Value']
+#     point_info_scores.drop(['Value', 'Std', 'Point', 'Unnamed: 0'], axis=1, inplace=True, errors='ignore')
+#     X = point_info_scores
+#     col_names = list(point_info_scores.columns)
+#
+#     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32), col_names
 
 
 # def load_expert_all(modifier):
@@ -68,13 +73,19 @@ def load_expert(modifier, all):
 
 
 def load_xy(mod, model=None):
-    if model == 'expert_ref' and mod.lower() in ['oc', 'ocall', 'ws', 'wsall']:  # Model is expert ref and test labels are available
-        return load_expert(mod, all=(mod[-3:] == 'all'))
-    elif model == 'hist_buildings' and mod.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:  # Model is hist_buildings and test labels are available
-        return load_histbld(mod)
-    else:
-        print(f'X and Y data cannot be loaded: {mod=} {model=}')
-        return
+    df = pd.read_csv(data_url + '/' + mod + '/' + model + '.csv')
+    col_names = list(df.columns)
+    df = df.to_numpy()
+    X = df[:, :-1]
+
+    y = df[:, -1]
+
+    if model == 'hist_buildings':
+        y[y < 0] = 0
+        y[y > 0] = 1
+    y = np.where(np.isnan(y), 0, y)  # No house is built on NaN cells
+
+    return np.array(X), np.array(y), col_names[:-1]
 
 
 def load_x(modifier):

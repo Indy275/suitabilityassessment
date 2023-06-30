@@ -32,7 +32,7 @@ def get_point_data(raster_url, point):
 
 
 def get_raster_data(raster_url, modifier, name, bbox, size):
-    geotiff_name_msk = data_url + '/rasters/' + modifier + '/msk_' + name + '.tiff'
+    geotiff_name_msk = data_url + '/rasters/' + modifier + '/' + name + '_msk.tiff'
 
     if not Path(geotiff_name_msk).is_file():
         print("No masked .tiff-file found for layer {}; retrieving and extracting data".format(name))
@@ -152,24 +152,40 @@ def create_df(modifier, bbox, size, model, test=False):
         os.makedirs(data_url + '/' + modifier)
         os.makedirs(data_url + '/rasters/' + modifier)
 
-    # Retrieve layer data based on a favourite instance
-    extracted_data, col_names = get_fav_data(modifier, model, bbox, size, test=test)
+    if modifier.lower().startswith(('ws', 'oc')) and model == 'expert_ref' and not test:
+        if modifier[-3:] == 'all':
+            all_exp_scores = pd.read_csv(data_url + f'/expertscoresall_{modifier[:-3]}.csv', header=[0])
+        else:
+            all_exp_scores = pd.read_csv(data_url + f'/expertscores_{modifier}.csv', header=[0])
+        exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
+        point_info_scores = all_exp_scores.merge(exp_point_info, on='Point', how='left',
+                                                 suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
+        y = point_info_scores['Value'].to_numpy()
+        point_info_scores.drop(['Value', 'Std', 'Point', 'Unnamed: 0'], axis=1, inplace=True, errors='ignore')
+        col_names = list(point_info_scores.columns)
+        col_names.append("expert_ref")
+        X = point_info_scores.to_numpy()
+        data = np.concatenate((X, y.reshape((-1, 1))), axis=1)
 
-    # NaN values are explicitly set to NaN instead of -9999
-    extracted_data[extracted_data < -9000] = np.nan
+    else:
+        # Retrieve layer data based on a favourite instance
+        data, col_names = get_fav_data(modifier, model, bbox, size, test=test)
 
-    # (n_feat, w, h) -> (w x h, n_feat)
-    data_extract2 = np.transpose(extracted_data, (1, 2, 0))
-    data_extract3 = np.reshape(data_extract2, (-1, data_extract2.shape[-1]))
+        # NaN values are explicitly set to NaN instead of -9999
+        data[data < -9000] = np.nan
+
+        # (n_feat, w, h) -> (w x h, n_feat)
+        data = np.transpose(data, (1, 2, 0))
+        data = np.reshape(data, (-1, data.shape[-1]))
 
     # Normalize the features (without normalizing location and labels)
     ss = StandardScaler()
-    extracted_loc = data_extract3[:, :2]
-    extracted_feats = ss.fit_transform(data_extract3[:, 2:-1])
-    extracted_labs = data_extract3[:, -1]
-    extracted = np.concatenate((extracted_loc, extracted_feats, extracted_labs.reshape((-1, 1))), axis=1)
+    loc_data = data[:, :2]
+    feats_data = ss.fit_transform(data[:, 2:-1])
+    labs_data = data[:, -1]
+    data_conc = np.concatenate((loc_data, feats_data, labs_data.reshape((-1, 1))), axis=1)
 
-    df = pd.DataFrame(extracted, columns=col_names)
+    df = pd.DataFrame(data_conc, columns=col_names)
 
     # Change outlier values: more than 3 standard deviations from mean are set to 95% percentile
     for column in df.columns[2:-1]:
@@ -183,4 +199,6 @@ def create_df(modifier, bbox, size, model, test=False):
         df.to_csv(data_url + '/' + modifier + "/testdata.csv", index=False)
 
     dump(ss, data_url + '/' + modifier + "/scaler.joblib")
-    print("Data with shape {} saved to {}.csv".format(extracted.shape, modifier))
+    print("Data with shape {} saved to {}.csv".format(data_conc.shape, modifier))
+
+
