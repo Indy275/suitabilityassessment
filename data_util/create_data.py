@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
+import matplotlib.pyplot as plt
 import rasterio
 from rasterio import features, mask
 from scipy.stats import zscore
@@ -21,20 +22,13 @@ config.read('config.ini')
 data_url = config['DEFAULT']['data_url']
 json_headers = json.loads(config['DEFAULT']['json_headers'])
 recreate_labs = True  # Always (re)create y-labels: something might have changed in the base layer
-
-
-def get_point_data(raster_url, point):
-    point_data = requests.get(url=raster_url + "/point/", headers=json_headers, params={"geom": point}).json()
-    try:
-        return point_data['results'][0]['value']
-    except:
-        return 0
+recreate_feats = False  # Always (re)create x-feats: something might have changed in the base layer
 
 
 def get_raster_data(raster_url, modifier, name, bbox, size):
     geotiff_name_msk = data_url + '/rasters/' + modifier + '/' + name + '_msk.tiff'
 
-    if not Path(geotiff_name_msk).is_file():
+    if not Path(geotiff_name_msk).is_file() or recreate_feats:
         print("No masked .tiff-file found for layer {}; retrieving and extracting data".format(name))
         geotiff_name = data_url + '/rasters/' + modifier + '/' + name + '.tiff'
         if not Path(geotiff_name).is_file():
@@ -42,18 +36,19 @@ def get_raster_data(raster_url, modifier, name, bbox, size):
             r = requests.get(url=raster_url + '/data/',
                              headers=json_headers,
                              params={"bbox": bbox_str, "format": 'geotiff', "width": size, "height": size})
-            with open(geotiff_name, 'wb') as f:  # Write raster data to disk
+            with open(geotiff_name, 'wb') as f:  # Write raster data from Lizard to disk
                 for data in r.iter_content(None):
                     f.write(data)
-        # Don't ask me how the rest of this function works; it somehow does
-        gdf = gpd.read_file(data_url + '/water_shp/invertedwatergang.shp')
+
+        gdf = gpd.read_file(data_url + '/water_shp/invertedwatergangHHNK.shp')
         nodata_val = -99999
         with rasterio.open(geotiff_name) as src:  # Read raster data from disk
+
             raster_data = src.read()
-            raster_data[raster_data < 0] = 0
+            raster_data[raster_data < 0] = 0  # NaN is indicated with -9999, set to 0
             raster_meta = src.meta
 
-        with rasterio.open(geotiff_name, 'w', **raster_meta) as dst:
+        with rasterio.open(geotiff_name, 'w', **raster_meta) as dst:  # Write modified raster data to disk
             dst.write(raster_data)
         with rasterio.open(geotiff_name) as src:  # Read raster data from disk
             gdf.to_crs(crs=src.meta['crs'], inplace=True)
@@ -67,15 +62,11 @@ def get_raster_data(raster_url, modifier, name, bbox, size):
             'nodata': nodata_val
         })
 
-        with rasterio.open(geotiff_name_msk, 'w', **raster_meta) as dst:
+        with rasterio.open(geotiff_name_msk, 'w', **raster_meta) as dst:  # Write data masked with watergangen
             dst.write(masked_data)
-
-    else:
-        print("Using found masked .tiff-file for layer {}".format(name))
 
     with rasterio.open(geotiff_name_msk) as f:  # Read raster data from disk
         data = f.read()
-
     return np.squeeze(data)
 
 
@@ -123,12 +114,21 @@ def get_labels(model, modifier, copy):
 
 
 def get_fav_data(modifier, model, bbox, size, test):
+    """ Retrieve the data layers present in the favourite instance
+
+    :param modifier: string indication of data source
+    :param model: model labels
+    :param bbox: bounding box
+    :param size: size of data to be produced
+    :param test: boolean indicating test data, to exclude labels
+    :return:
+    """
     fav_url = "https://hhnk.lizard.net/api/v4/favourites/97ffd069-1da0-43f3-964e-cdded4a8565b/"
     r = requests.get(url=fav_url, headers=json_headers)
     data = r.json()['state']
     lng = np.linspace(min([bbox[0], bbox[2]]), max([bbox[0], bbox[2]]), size)
     lat = np.linspace(max([bbox[1], bbox[3]]), min([bbox[1], bbox[3]]), size)
-    Y, X = np.meshgrid(lng, lat)  # This intentionally swapped: numpy
+    X, Y = np.meshgrid(lng, lat)
     col_names, combined_sources = ['Lng', 'Lat'], [X, Y]
     for layer in data['layers']:
         raster_url = "https://hhnk.lizard.net/api/v4/rasters/{}".format(layer['uuid'])
@@ -156,7 +156,7 @@ def create_df(modifier, bbox, size, model, test=False):
         if modifier[-3:] == 'all':
             all_exp_scores = pd.read_csv(data_url + f'/expertscoresall_{modifier[:-3]}.csv', header=[0])
         else:
-            all_exp_scores = pd.read_csv(data_url + f'/expertscores_{modifier}.csv', header=[0])
+            all_exp_scores = pd.read_csv(data_url + f'/expertscores2_{modifier}.csv', header=[0])
         exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
         point_info_scores = all_exp_scores.merge(exp_point_info, on='Point', how='left',
                                                  suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
@@ -188,17 +188,20 @@ def create_df(modifier, bbox, size, model, test=False):
     df = pd.DataFrame(data_conc, columns=col_names)
 
     # Change outlier values: more than 3 standard deviations from mean are set to 95% percentile
-    for column in df.columns[2:-1]:
-        threshold = np.nanpercentile(df[column], 95)
-        mask = zscore(df[column], nan_policy='omit') > 3
+    # if test:
+    for i, column in enumerate(df.columns[2:-1]):
+        threshold = np.nanmedian(df[column])#np.nanpercentile(df[column], 95)
+        mask = zscore(df[column], nan_policy='omit') > 6
+        # print(f'Column {column} has {sum(mask)} values outside 6 standard deviations ({sum(mask)/len(mask)}%)')
+        # print(f'For those {sum(mask)} rows, changed the value to {threshold}')
         df.loc[mask, column] = threshold
 
     if not test:
         df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
+        dump(ss, data_url + '/' + modifier + "/" + model + "_scaler.joblib")
+        print("Data with shape {} saved to {}/{}.csv".format(data_conc.shape, modifier, model))
+
     else:
         df.to_csv(data_url + '/' + modifier + "/testdata.csv", index=False)
-
-    dump(ss, data_url + '/' + modifier + "/scaler.joblib")
-    print("Data with shape {} saved to {}.csv".format(data_conc.shape, modifier))
-
-
+        dump(ss, data_url + '/' + modifier + "/testdata_scaler.joblib")
+        print("Data with shape {} saved to {}/testdata.csv".format(data_conc.shape, modifier))

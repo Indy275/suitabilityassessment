@@ -5,6 +5,8 @@ from pathlib import Path
 import matplotlib.image as mpimg
 import pandas as pd
 import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
@@ -19,7 +21,7 @@ def load_orig_df(mod):
     X = df[:, :-1]
 
     # load and reverse apply scaler
-    ss = load(data_url + '/' + mod + '/' + "scaler.joblib")
+    ss = load(data_url + '/' + mod + "/testdata_scaler.joblib")
     df_orig = ss.inverse_transform(X[:, 2:])
 
     return df_orig, col_names
@@ -95,8 +97,8 @@ def load_x(modifier):
     return np.array(X), col_names[:-1]
 
 
-def load_bg(modifier):
-    bg_png = data_url + '/' + modifier + '/bg_downscaled' + '.png'
+def load_bg_png(modifier):
+    bg_png = data_url + '/' + modifier + '/bg' + '.png'
     if Path(bg_png).is_file():
         # with rasterio.open(bg_tiff) as f:  # Write raster data to disk
         #     bg = f.read(1)
@@ -105,3 +107,34 @@ def load_bg(modifier):
         bg = np.zeros((10, 10))
         bg += 1e-4
     return bg
+
+
+def load_bg(modifier):
+    bg_png = data_url + '/' + modifier + '/bg.tif'
+    if Path(bg_png).is_file():
+        # with rasterio.open(bg_tiff) as f:  # Write raster data to disk
+        #     bg = f.read(1)
+        # with rasterio.open(bg_png) as f:  # Read raster data from disk
+        #     data = f.read()
+        bg = Image.open(bg_png)
+    else:
+        # bg = np.zeros((10, 10))
+        # bg += 1e-4
+        bg = load_bg_png(modifier)
+    return bg
+
+
+def preprocess_input(X_train, y_train, X_test, col_names):
+    lnglat = 0  # 0 includes lng,lat. 2 is excluding.
+    trainLngLat = X_train[:, :2]
+    testLngLat = X_test[:, :2]
+
+    X_train = X_train[y_train != 0]
+    X_train = X_train[:, lnglat:]
+    y_train = y_train[y_train != 0]
+
+    test_nans = np.isnan(X_test).any(axis=1)
+    X_test = X_test[~test_nans]
+    X_test_feats = X_test[:, lnglat:]
+    col_names = col_names[lnglat:]
+    return X_train, y_train, X_test_feats, trainLngLat, testLngLat, test_nans, col_names
