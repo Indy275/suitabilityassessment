@@ -45,17 +45,17 @@ class OCGP():
         self.L = np.linalg.cholesky(self.K)
         self.alpha = np.linalg.solve(np.transpose(self.L), (np.linalg.solve(self.L, np.ones((np.size(self.K, 0), 1)))))
 
-    def getGPRscore(self, modes):
+    def getGPRscore(self, mode):
 
-        if modes == 'mean':
+        if mode == 'mean':
             score = np.dot(np.transpose(self.Ks), self.alpha)
 
-        elif modes == 'var':
+        elif mode == 'var':
             if np.size(self.v) == 0:
                 self.v = np.linalg.solve(self.L, self.Ks)
             score = [a + b for a, b in zip(-self.Kss, sum(np.multiply(self.v, self.v)))]
 
-        elif modes == 'pred':
+        elif mode == 'pred':
             if np.size(self.v) == 0:
                 self.v = np.linalg.solve(self.L, self.Ks)
             if np.size(self.var) == 0:
@@ -64,7 +64,7 @@ class OCGP():
                 np.power((np.ones((np.size(self.var, 0), 1))) - (np.dot(np.transpose(self.Ks), self.alpha)), 2),
                 self.var) + np.log(np.multiply(2 * np.pi, self.var)))
 
-        elif modes == 'ratio':
+        elif mode == 'ratio':
             if np.size(self.v) == 0:
                 self.v = np.linalg.solve(self.L, self.Ks)
             if np.size(self.var) == 0:
@@ -167,37 +167,29 @@ class OCGP():
 
 
 def run_model(train_mod, test_mod, train_size, test_size):
-    X_train, y_train, _ = data_loader.load_xy(train_mod, model='hist_buildings')
-    X_test, _ = data_loader.load_x(test_mod)
+    X_train, y_train, train_col_names = data_loader.load_xy(train_mod, model='hist_buildings')
+    X_test, test_col_names = data_loader.load_x(test_mod)
+    assert train_col_names == test_col_names
+    bg = data_loader.load_bg(test_mod)
 
-    n_feats = 7
-    X = X_train[:, -n_feats:]
-
-    # width, height = 40, 40
-    # X = X.reshape((width, height, n_feats))
-    # Y = Y.reshape((width, height))
-    # width, height = 20, 20
-    # X = X[0:20, 20:40, :]
-    # Y = Y[0:20, 20:40]
-    # X = X.reshape((width*height, n_feats))
-    # Y = Y.reshape((width*height,))
-
-    train_vals = y_train != 0
-    X_train = X[train_vals]
-    y_train = y_train
-
+    X_train, y_train, X_test, trainLngLat, testLngLat, test_nans, col_names = data_loader.preprocess_input(X_train, y_train, X_test,
+                                                                                          train_col_names)
     if plot_data:
         bg_train = data_loader.load_bg(train_mod)
         bg_test = data_loader.load_bg(test_mod)
         plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
 
     kernel, v, N, svar, ls, p = set_hypers()
+
+    fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
+    name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
+
     ocgp = OCGP()
 
     if kernel == "se":
         title = f'SE kernel with ls={ls}, svar={svar}'
         ocgp.seKernel(X_train, X_test, ls, svar)
-    if kernel == "adaptive":
+    elif kernel == "adaptive":
         ls = ocgp.adaptiveHyper(X_train, p)
         ls = np.log(ls)
         title = f'Adaptive hyper with svar={svar}, p={p}, and learned ls={ls}'
@@ -208,26 +200,36 @@ def run_model(train_mod, test_mod, train_size, test_size):
         meanDist_xn, meanDist_yn = ocgp.scaledHyper(X_train, X_test, N)
         title = f'Scaled hyper with svar={svar}, v={v}, N={N}'
         ocgp.scaledKernel(X_train, X_test, v, meanDist_xn, meanDist_yn, svar)
+    else:
+        print(f'Not implemented: {kernel=}')
+        return
 
     modes = ['mean', 'var', 'pred', 'ratio']
     titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
               r'log. moment ratio $\mu_*/\sigma_*$']
 
-    X1 = X_test[:, 1]
-    X2 = X_test[:, 0]
+    X1 = testLngLat[:, 0]
+    X2 = testLngLat[:, 1]
     cmap = plot.set_colmap()
     cmap.set_bad('tab:blue')
-    bg = data_loader.load_bg(test_mod)
+
     for i in range(len(modes)):
-        score = np.array(ocgp.getGPRscore(modes[i]))
-        ax = plt.subplot(2, 2, i + 1)
-        ax.imshow(bg, extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], origin='upper')
-        plt.imshow(score.reshape((test_size, test_size)), vmin=np.nanmin(score), cmap=cmap, alpha=0.65,
-                        vmax=np.nanmax(score), extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], aspect='auto')
-        ax.set_title(titles[i])
-    plt.suptitle(title)
-    plt.tight_layout()
-    fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
-    name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
-    plt.savefig(name, bbox_inches='tight')
-    plt.show()
+        y_preds = np.zeros((test_nans.shape[0], 3))  # (:, lon, lat, y_pred, y_var)
+        y_preds[:, :2] = testLngLat[:, :2]  # test x and y
+        y_preds[test_nans, 2] = np.nan
+        print("Creating scores and plotting using",modes[i])
+        y_preds[~test_nans, 2] = np.squeeze(np.array(ocgp.getGPRscore(modes[i])))
+        score = y_preds[:, 2]
+        if plot_pred:
+            ax = plt.subplot(2, 2, i + 1)
+            ax.imshow(bg, extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], origin='upper')
+            # plt.imshow(score.reshape((test_size, test_size)), vmin=np.nanmin(score), cmap=cmap, alpha=0.7,
+            #                 vmax=np.nanmax(score), extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], aspect='auto')
+            plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
+                         cmap=cmap, origin='upper', alpha=0.65)
+            ax.set_title(titles[i])
+    if plot_pred:
+        plt.suptitle(title)
+        plt.tight_layout()
+        plt.savefig(name, bbox_inches='tight')
+        plt.show()
