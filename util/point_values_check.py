@@ -34,13 +34,13 @@ def read_fav_dp(uuid, cluster):
         Y.append(geom['geometry']['coordinates'][1])
         dp.append(row_name)
     print("Currently, {} data points are collected".format(len(X)))
-    data = pd.DataFrame(list(zip(dp, X, Y)), columns=['point', 'X', 'Y'])
+    data = pd.DataFrame(list(zip(dp, X, Y)), columns=['Point', 'Lng', 'Lat'])
     data.to_csv(data_url + "/expert_points_{}.csv".format(cluster), index=False)
 
 
 def read_dp_csv(cluster):
     df = pd.read_csv(data_url + "/expert_points_{}.csv".format(cluster))
-    return df['point'], df['X'], df['Y']
+    return df['Point'], df['Lng'], df['Lat']
 
 
 def read_points(raster_uuids, col_names, x, y):
@@ -92,19 +92,6 @@ def interacting_factors(df):
     df.to_csv(data_url + 'wspoint_counts.csv')
 
 
-def check_similarity():
-    arr = total_df.to_numpy()
-    ss = StandardScaler()
-    # arr = ss.fit_transform(arr[:, 1:-3])
-    arr = arr[:, 1:-3]
-    sample = arr[sample_id]
-    for sample in arr:
-        for row in arr:
-            cos_sim = (row @ sample.T) / (norm(row) * norm(sample))
-            if 0.8 < cos_sim < 1.0:
-                print(row, sample, "similarity", cos_sim)
-
-
 def get_pointinfo(dp_uuid, cluster):
     read_fav_dp(dp_uuid, cluster)
     r, raster_uuids, col_names = get_fav_data(dp_uuid)
@@ -119,7 +106,7 @@ def get_pointinfo(dp_uuid, cluster):
     df.to_csv(data_url + "/point_info_{}.csv".format(cluster), index=False)
 
 
-cluster = 'OC'
+cluster = 'WS'
 dp_uuid = "917100d2-7e3f-430f-a9d5-1fb42f5bb7d0"  # WS;  Get the data points from here
 # "89c4db99-7a1a-4aa1-8abc-f89133d20d63"  # OC
 
@@ -132,20 +119,9 @@ dp_uuid = "917100d2-7e3f-430f-a9d5-1fb42f5bb7d0"  # WS;  Get the data points fro
 # total_df.to_csv(data_url+"/expert_point_info_{}.csv".format(cluster))
 
 total_df = pd.read_csv(data_url + "/expert_points_{}.csv".format(cluster))
-print([round(min(total_df['X']), 4) - 0.01, round(min(total_df['Y']), 4) - 0.01, round(max(total_df['X']), 4) + 0.01,
-       round(max(total_df['Y']), 4) + 0.01])
+print([round(min(total_df['Lng']), 4) - 0.01, round(min(total_df['Lat']), 4) - 0.01, round(max(total_df['Lng']), 4) + 0.01,
+       round(max(total_df['Lat']), 4) + 0.01])
 
-
-# df.hist()
-# plt.show()
-# taken_ids = []
-# for _ in range(10):
-#     sample_id = np.random.permutation(len(total_df))[:5]
-#     taken_ids.append(list(sample_id))
-# print(taken_ids)
-# flat_list = [item for sublist in taken_ids for item in sublist]
-# taken = list(set(flat_list))
-# print(len(total_df),'ids in list, taken:',len(taken))
 
 
 def shuff(samples):

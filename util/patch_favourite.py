@@ -53,7 +53,7 @@ def read_fav_dp(uuid, cluster):
 
 
 def read_dp_csv(cluster):
-    df = pd.read_csv(data_url + "/expert_points_{}.csv".format(cluster))
+    df = pd.read_csv(data_url + f'/{cluster.lower()}/expert_points_{cluster}.csv')
     return df['point'], df['X'], df['Y']
 
 
@@ -184,7 +184,7 @@ def switch_layer(uuid, bool):
     for l in r['state']['layers']:
         l['active'] = bool
         l['opacity'] = 1
-        # if not l['name'] == "Bodemberging bij grondwaterstand gelijk aan streefpeil":
+        # if not l['name'] == "Bodemberging bij gemiddelde hoogste grondwaterstand - Huidig klimaat":
         new_layer.append(l)
     # bodemberging = {
     #             "name": "Bodemberging bij grondwaterstand gelijk aan streefpeil",
@@ -226,24 +226,29 @@ def new_fav(uuid, X, Y, newname='', override=False):
         geoms.append(new_point)
     r['state']['geometries'] = geoms
     r['name'] = newname
+    r['state']['spatial']['view']['lat'] = np.mean(Y)
+    r['state']['spatial']['view']['lng'] = np.mean(X)
 
     r = requests.patch('https://hhnk.lizard.net/api/v4/favourites/{}/'.format(uuid), json=r, headers=json_headers)
     print("Patching geometry:", r.status_code, r.reason)
 
 
-uuid_list = ['5487d521-2e93-45ee-b13d-9bd2aff16559'] #['97ffd069-1da0-43f3-964e-cdded4a8565b', '97ffd069-1da0-43f3-964e-cdded4a8565b']
-# uuid_list.append(get_uuidlist(startswith='Comparisons_WSB')) #'Comparisons_WSB'   'testfav'
-# uuid_list.append(get_uuidlist(startswith='Comparisons_WSB7_GR')) #'Comparisons_WSB'   'testfav'
-# uuid_list.append(get_uuidlist(startswith='Comparisons_WSB6_HR')) #'Comparisons_WSB'   'testfav'
-# uuid_list.append(get_uuidlist(startswith='Comparisons_WSB7_KR')) #'Comparisons_WSB'   'testfav'
+def createCNOZb():
+    # uuid = post_favourite()
+    uuid = '78b71e31-4d8b-4823-90fc-29f4da7b13d5'
+    points, xs, ys = read_dp_csv('WS')
+    X, Y = [], []
+    for p, x, y in zip(points, xs, ys):
+        if p in list('CNOZb'):
+            X.append(x)
+            Y.append(y)
+    print(X, Y)
+    new_fav(uuid, X, Y, newname='CNOZb')
+
+
+uuid_list = ['78b71e31-4d8b-4823-90fc-29f4da7b13d5'] #['97ffd069-1da0-43f3-964e-cdded4a8565b', '97ffd069-1da0-43f3-964e-cdded4a8565b']
 
 # uuid_list = np.squeeze(uuid_list)
 # print(len(uuid_list), uuid_list)
 for uid in uuid_list:
-    switch_layer(uid, bool=False)
-
-# X = [4.78729, 4.88033,5.04805, 4.93269, 4.90,4.96284, 4.51813, 5.2803, 5.0168, 5.0853]
-# Y = [52.59679,52.53982, 52.52374, 52.46846, 52.4800,52.51857, 52.45099,52.96078, 52.51664, 52.48006]
-
-# uuid = post_favourite()
-# new_fav(uuid, X, Y, newname='bounds')
+    switch_layer(uid, bool=True)
