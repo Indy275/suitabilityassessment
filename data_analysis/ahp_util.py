@@ -22,7 +22,7 @@ def build_matrix(data):
     row_idx = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3]
     val_idx = [0, 7, 5, 3, 1, 3, 5, 7]  # standard AHP-like: with one option less (9x)
     val_idx = [0, 4, 3, 2, 1, 2, 3, 4]  # four-point scale
-    s = 1.5
+    s = 1.2
     val_idx = [0, (1+s)**3, (1+s)**2, (1+s), 1, (1+s), (1+s)**2, (1+s)**3]  # geometric scale (Finan,Hurley): Transitive calibration of the AHP verbal scale
 
     for i, expert in enumerate(data.itertuples()):  # loop over expert comparison matrices
@@ -44,44 +44,42 @@ def build_matrix(data):
 
 def compute_consistency_ratio(matrix):
     n = len(matrix)
-    # Calculate the eigenvalues and eigenvectors
-    eigenvalues, eigenvectors = np.linalg.eig(matrix)
-    max_eigenvalue_index = np.argmax(eigenvalues)
-    eigenvector = eigenvectors[:, max_eigenvalue_index]
-
-    weighted_sum = np.dot(matrix, eigenvector)
-    max_eigenvalue = np.sum(weighted_sum / eigenvector) / n
-
-    consistency_index = (max_eigenvalue - n) / (n - 1)
+    lambda_max = np.max(np.linalg.eigvals(matrix))
+    consistency_index = (lambda_max - n) / (n - 1)
 
     ri_dict = {3: 0.52, 4: 0.89, 5: 1.11, 6: 1.25, 7: 1.35, 8: 1.40, 9: 1.45,
                10: 1.49, 11: 1.52, 12: 1.54, 13: 1.56, 14: 1.58, 15: 1.59}
 
     random_index = ri_dict[n]
-    consistency_ratio = consistency_index / random_index
+
+    consistency_ratio = np.real(consistency_index / random_index)
 
     return consistency_ratio
 
 
 def compute_priority_weights(matrix):
-    matrix = np.array([[1e-7 if x == 0 else x for x in sublist] for sublist in matrix])
-    eigenvalues, eigenvectors = np.linalg.eig(matrix)
-    max_eigenvalue_index = np.argmax(eigenvalues)
-    priority_vector = np.real(eigenvectors[:, max_eigenvalue_index])
-    # scaler = MinMaxScaler(feature_range=(-10, 10))
-    # priority_weights = scaler.fit_transform(priority_vector.reshape(-1, 1))
-    priority_weights = np.zeros(matrix.shape[1])
-    for i in range(0, matrix.shape[1]):
-        priority_weights[i] = reduce((lambda x, y: x * y), matrix[i, :]) ** (1 / matrix.shape[1])
-    priority_weights = priority_weights / np.sum(priority_weights)
-    return list(priority_weights)
+    """
+    Computes the priority weights of elements in a pairwise comparison matrix.
+    First normalizes column-wise, then aggregates row-wise
+    See e.g. https://www.spicelogic.com/docs/ahpsoftware/intro/ahp-calculation-methods-396 for explanation
+    :param matrix: pairwise nxn comparison matrix
+    :return: priority vector size n
+    """
+    return list(np.mean(matrix / np.sum(matrix, axis=0), axis=1))
 
 
 def compute_priority_weights_aggregate(matrix):
+    """
+        Computes the priority weights of elements in a pairwise comparison matrix.
+        Takes the geometric mean of the matrices, then continues with a nxn matrix
+        First normalizes column-wise, then aggregates row-wise
+        See e.g. https://www.spicelogic.com/docs/ahpsoftware/intro/ahp-calculation-methods-396 for explanation
+        :param matrix: pairwise mxnxn comparison matrix with m the number of experts, n the matrix size
+        :return: priority vector size n
+        """
     geomatrix = [geo_mean(matrix[:, i, j]) for i in range(matrix.shape[1]) for j in range(matrix.shape[2])]
     geomatrix = np.reshape(geomatrix, (matrix.shape[1], matrix.shape[2]))
-    priority_weights = np.mean(geomatrix / np.sum(geomatrix, axis=0), axis=1)
-    return list(priority_weights)
+    return list(np.mean(geomatrix / np.sum(geomatrix, axis=0), axis=1))
 
 
 def read_dp_csv(cluster):
