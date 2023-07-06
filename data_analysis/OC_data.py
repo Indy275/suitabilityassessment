@@ -26,7 +26,7 @@ print("Number of participants that completed survey:",len(data))
 duration = pd.to_numeric(data['Duration_(in_seconds)'])
 
 matrix = ahp_util.build_matrix(data)
-consistency_ratio = [ahp_util.compute_consistency_ratio(matrix[expert]) for expert in range(len(data))]
+consistency_ratio = [ahp_util.compute_consistency_ratio(matrix[expert]).real for expert in range(len(data))]
 priority_weights = [ahp_util.compute_priority_weights(matrix[expert]) for expert in range(len(data))]
 print("mean per location ", np.array(priority_weights).mean(axis=0))
 print("std per location ", np.array(priority_weights).std(axis=0))
@@ -55,12 +55,3 @@ with open(data_url + "/expertscores_{}.csv".format(cluster), 'w') as f:
     f.write("Point,Lng,Lat,Value,Std\n")
     for p, x, y, mean, std in zip(dp, X, Y, location_gm, location_std):
         f.write("%s,%s,%s,%s,%s\n" % (p, x, y, mean, std))
-
-# ratio2 = [(0.41913123688450415+0j), (0.2814425675943259+0j), (0.5795550347978271+0j), (0.1447406877493689+0j), (0.6756547403936265+0j), (0.14944429913930798+0j), (0.2809649680632276+0j), (0.24101441674116333+0j), (0.19959397671736384+0j), (0.21996983966116834+0j), (0.5079029065848542+0j), (0.12372896167266693+0j)]
-# plt.boxplot([ratio2, consistency_ratio])
-# labels = ['WS', 'OC']
-# plt.xticks(ticks=range(1, len(labels) + 1), labels=labels)
-# plt.ylim([0,1])
-# left, right = plt.xlim()
-# plt.hlines(y=0.1, xmin=left, xmax=right, linestyles='dashed', colors=['red'])
-# plt.show()

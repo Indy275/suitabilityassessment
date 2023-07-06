@@ -20,7 +20,11 @@ def build_matrix(data):
     matrix = np.ones((n_experts, 5, 5))
     col_idx = [1, 2, 3, 4, 2, 3, 4, 3, 4, 4]
     row_idx = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3]
-    val_idx = [0, 7, 5, 3, 1, 3, 5, 7]
+    val_idx = [0, 7, 5, 3, 1, 3, 5, 7]  # standard AHP-like: with one option less (9x)
+    val_idx = [0, 4, 3, 2, 1, 2, 3, 4]  # four-point scale
+    s = 1.5
+    val_idx = [0, (1+s)**3, (1+s)**2, (1+s), 1, (1+s), (1+s)**2, (1+s)**3]  # geometric scale (Finan,Hurley): Transitive calibration of the AHP verbal scale
+
     for i, expert in enumerate(data.itertuples()):  # loop over expert comparison matrices
         for j, comp in enumerate(data.columns[-10:]):
             c = col_idx[j]

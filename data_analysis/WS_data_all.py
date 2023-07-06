@@ -46,4 +46,4 @@ weights = weights.merge(point_data, on='Point', how='left')
 weights = weights[['Point', 'Lng', 'Lat', 'Value']]
 weights.sort_values(by='Point', inplace=True)
 
-weights.to_csv(data_url + "/expertscoresall_{}.csv".format(cluster), index=False)
+weights.to_csv(data_url + "/expertscoresall2_{}.csv".format(cluster), index=False)
