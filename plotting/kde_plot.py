@@ -17,7 +17,7 @@ config.read('config.ini')
 
 
 def run_model(train_mod, test_h):
-    X, Y, _, _ = data_loader.load_data(train_mod, ref_std='hist_buildings')
+    X, Y, _ = data_loader.load_xy(train_mod, model='hist_buildings')
     X = X[:, :2]
     houses = Y != 0
     X_train = X[houses]

@@ -4,10 +4,10 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import LinearSegmentedColormap
 from textwrap import wrap
 
-from data_util import load_data
+from data_util import data_loader
 
 
-X_train, X, train_col_names = load_data.load_xy('purmerend')
+X_train, _, X, train_col_names = data_loader.load_data('purmerend')
 
 # fig = plt.figure()
 # ax = fig.add_subplot(projection='3d')
