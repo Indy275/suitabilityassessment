@@ -13,12 +13,12 @@ def plot_f_importances(coef, names):
     plot_pred.plot_f_importances(coef, names)
 
 
-def plot_prediction(y_pred, height, figname,digitize_pred=False, sigmoid_pred=False, ax=None, bg=None):
-    return plot_pred.plot_prediction(y_pred, height, figname, digitize_pred=digitize_pred, sigmoid_pred=sigmoid_pred, ax=ax, bg=bg)
+def plot_prediction(y_pred, height, figname, train_labs=None, contour=True, bg=None, savefig=True):
+    plot_pred.plot_prediction(y_pred, height, figname, train_labs=train_labs, contour=contour, bg=bg, savefig=savefig)
 
 
-def plot_contour(y_preds, test_size, fig_name, bg=None):
-    plot_pred.plot_contour(y_preds, test_size, fig_name, bg)
+def plot_y_expert(test_mod, X, y, bg):
+    plot_data.plot_y_expert(test_mod, X, y, bg)
 
 
 def plot_loss(loss):

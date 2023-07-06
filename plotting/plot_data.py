@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+import plotting.plot
+
 
 def plot_xy(X_train, y_train, X_test, y_test, train_h, train_w, test_h, test_w):
     fig, ax = plt.subplots(2, 2)
@@ -44,4 +46,18 @@ def plot_y(y_train, bg_train, bg_test, train_size, test_size):
     for i, (y_i, b, y_t_i, h, w) in enumerate(zip(y, bg, y_t, height, width)):
         plot_row(y_i, b, y_t_i, ax, i, h, w)
     plt.tight_layout()
+    plt.show()
+
+
+def plot_y_expert(mod, X, y, bg):
+    fig, ax = plt.subplots()
+    cmap = plotting.plot.set_colmap()
+    ax.imshow(bg, extent=[4.8281, 5.0457, 52.5892, 52.714], origin='upper', alpha=0.8)
+    for x0, x1, yi in zip(X[:, 0], X[:, 1], y):
+        print(f'({x0},{x1}): {yi}')
+    ax.scatter(X[:, 0], X[:, 1], c=y, cmap=cmap, s=50)
+
+    posperc = len(y[y != 0]) / len(y) * 100
+    ax.set_title("{} labels: {} positive ({:.2f}%)".format(mod, len(y[y != 0]), posperc))
+    # ax.tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False)
     plt.show()

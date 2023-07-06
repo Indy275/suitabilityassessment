@@ -24,7 +24,7 @@ class DashApp():
         self.app = Dash(__name__)
         if w_model:
             if w_model == 'expert':
-                weights_init = pd.read_csv(data_url + "/factorweights_{}.csv".format(modifier))
+                weights_init = pd.read_csv(data_url + "/factorweights_WS.csv")
                 weights_init = weights_init['Median']
             else:
                 weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
@@ -33,6 +33,7 @@ class DashApp():
             weights_init = np.repeat([1], 5)
         unweighted_df, col_names = data_loader.load_x(modifier)
         df_orig, col_names = data_loader.load_orig_df(modifier)
+        ws_X, ws_y, _ = data_loader.load_xy('ws', model='expert_ref')
 
         unweighted_df = unweighted_df[:, 2:]
         col_names = col_names[2:-1]
@@ -98,36 +99,15 @@ class DashApp():
             weighted_df += abs(min(weighted_df))  # ensure all score are positive
 
             weighted_df = (weighted_df - weighted_df.mean()) / weighted_df.std()  # standardisation
-            min_max_val = 5
-            weighted_df *= (min_max_val * -1 / weighted_df.min())
+            weighted_df *= (5*-1 / weighted_df.min())
 
             weighted_df = weighted_df.reshape((size, size))
-            nullval = weighted_df[0][0]
+            nullval = weighted_df[0][0]  # assumption that the point top-left is always the null value
             weighted_df[weighted_df == nullval] = weighted_df.min()-0.001
             colmap = [[0.0, 'rgb(31,119,180)'], [0.00001, 'rgb(255,0,0)'], [1.0, 'rgb(145,210, 80)']]
 
-            # # Python got retarded so this part is ignored -idea was to mask parts of the map that are water
-            # nan_df, _, _ = load_data.load_xy(modifier)
-            # nan_df = nan_df[:, -1]
-            # nan_df = np.array(nan_df).reshape((-1, 1))
-            # print("weighteddf0",weighted_df[0])
-            # print("nandf",nan_df[0])
-            # mask = np.ma.masked_where(~(np.isfinite(nan_df)), nan_df)
-            # weighted_df = np.ma.masked_where(~(np.isfinite(nan_df)), weighted_df).reshape((h, w))
-            # print("weighteddf1shape",weighted_df.shape)
-            # print("maskshape",mask.shape)
-            # print("mask",mask[0], mask[55555])
-            # print("gothere")
-            # weighted_df = np.squeeze(weighted_df)
-            # nan_df = np.squeeze(nan_df)
-            # weighted_df = weighted_df[~nan_df]
-            # print("gotheretoo")
-            # print("weighteddf2",weighted_df[0])
-            # weighted_df = np.array(weighted_df).reshape((h, w))
-            # print("weighteddf3",weighted_df[0])
-            # fig = px.imshow(nan_df, color_continuous_scale=[[0.0, 'rgb(0,0,255)'], [1.0, 'rgb(0,0,255)']])
-
             fig = px.imshow(weighted_df, labels=dict(color='suitability_score'), color_continuous_scale=colmap)
+
             fig.update_layout(
                 plot_bgcolor='blue',
                 xaxis=dict(showgrid=False),
