@@ -6,126 +6,103 @@ import matplotlib.image as mpimg
 import pandas as pd
 import numpy as np
 from PIL import Image
-import matplotlib.pyplot as plt
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
+coords_as_features = config.getboolean('DATA_SETTINGS','coords_as_features')
 
 
-def load_orig_df(mod):
-    df = pd.read_csv(data_url + '/' + mod + '/testdata.csv')
-    col_names = list(df.columns)
-    df = df.to_numpy()
-    X = df[:, :-1]
+class DataLoader:
+    def __init__(self, modifier, model):
+        self.modifier = modifier
+        self.model = model  # hist_buildings, expert_ref or testdata
+        self.X = None
+        self.lnglat = None
+        self.col_names = None
+        self.y = None
+        self.load_data()
 
-    # load and reverse apply scaler
-    ss = load(data_url + '/' + mod + "/testdata_scaler.joblib")
-    df_orig = ss.inverse_transform(X[:, 2:])
+    def load_orig_df(self):
+        # load and reverse apply scaler
+        ss = load(data_url + '/' + self.modifier + "/" + self.model + "_scaler.joblib")
+        df_orig = ss.inverse_transform(self.X)
+        return df_orig
 
-    return df_orig, col_names
+    def load_data(self):
+        df = pd.read_csv(data_url + '/' + self.modifier + '/' + self.model + '.csv')
+        col_names = list(df.columns)
+        X_lnglat_feat = df.to_numpy()[:, :-1]
+        self.X = np.array(X_lnglat_feat[:, 2:])
+        self.lnglat = np.array(X_lnglat_feat[:, :2])
+        y = df[:, -1]
+        if self.model == 'hist_buildings':
+            y[y < 0] = 0
+            y[y > 0] = 1
+        y = np.where(np.isnan(y), 0, y)  # No house is built on NaN cells
+        self.y = np.array(y)
+        self.col_names = col_names[:-1]
 
+    def _preprocess_test(self):
+        if coords_as_features:
+            X = self.X
+            col_names = self.col_names
+        else:
+            X = self.X[:, 2:]
+            col_names = self.col_names[2:]
+        nans = np.isnan(self.X).any(axis=1)
+        X = X[~nans]
+        return X, nans, self.lnglat, col_names
 
-# def load_histbld(modifier, model):
-#     df = pd.read_csv(data_url + '/' + modifier + '/' + model + '.csv')
-#     col_names = list(df.columns)
-#     df = df.to_numpy()
-#     X = df[:, :-1]
-#
-#     y = df[:, -1]
-#
-#     if model == 'hist_buildings':
-#         y[y < 0] = 0
-#         y[y > 0] = 1
-#     y = np.where(np.isnan(y), 0, y)  # No house is built on NaN cells
-#
-#     return np.array(X), np.array(y), col_names[:-1]
-#
-#
-# def load_expert(modifier, all):
-#     df = pd.read_csv(data_url + '/' + modifier + "/expert_ref.csv", header=[0])
-#     col_names = list(df.columns)
-#
-#     if all:
-#         all_exp_scores = pd.read_csv(data_url + f'/expertscoresall_{modifier}.csv', header=[0])
-#     else:
-#         all_exp_scores = pd.read_csv(data_url + f'/expertscores_{modifier}.csv', header=[0])
-#     exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
-#     point_info_scores = all_exp_scores.merge(exp_point_info, on='Point', how='left',
-#                                              suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
-#     y = point_info_scores['Value']
-#     point_info_scores.drop(['Value', 'Std', 'Point', 'Unnamed: 0'], axis=1, inplace=True, errors='ignore')
-#     X = point_info_scores
-#     col_names = list(point_info_scores.columns)
-#
-#     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32), col_names
+    def _preprocess_train(self):
+        if coords_as_features:
+            X = self.X[self.y != 0]
+            col_names = self.col_names
+        else:
+            X = self.X[:, 2:]
+            X = X[self.y != 0]
+            col_names = self.col_names[2:]
+        y = self.y[self.y != 0]
+        return X, y, self.lnglat, col_names
 
+    def preprocess_input(self):
+        if self.model == 'testdata':
+            return self._preprocess_test()
+        elif self.model in ['hist_buildings', 'expert_ref']:
+            return self._preprocess_train()
 
-# def load_expert_all(modifier):
-#     all_exp_scores = pd.read_csv(data_url + '/expertscoresall_{}.csv'.format(modifier), header=[0])
-#     exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
-#     point_info_scores = all_exp_scores.merge(exp_point_info, on='Point', how='left',
-#                                              suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
-#     print(point_info_scores.columns)
-#     y = point_info_scores['Value']
-#     point_info_scores.drop(['Value', 'Point', 'Unnamed: 0'], axis=1, inplace=True)
-#     X = point_info_scores
-#     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32), point_info_scores.columns[2:]
+    def load_bg_png(self):
+        bg_png = data_url + '/' + self.modifier + '/bg' + '.png'
+        if Path(bg_png).is_file():
+            bg = mpimg.imread(bg_png)
+        else:
+            bg = np.zeros((10, 10))
+            bg += 1e-4
+        return bg
 
+    def load_bg(self):
+        bg_png = data_url + '/' + self.modifier + '/bg.tif'
+        if Path(bg_png).is_file():
+            bg = Image.open(bg_png)
+        else:
+            bg = self.load_bg_png()
+        return bg
 
-def load_xy(mod, model=None):
-    df = pd.read_csv(data_url + '/' + mod + '/' + model + '.csv')
-    col_names = list(df.columns)
-    df = df.to_numpy()
-    X = df[:, :-1]
+    def get_xy(self):
+        return self.X, self.y, self.col_names
 
-    y = df[:, -1]
-
-    if model == 'hist_buildings':
-        y[y < 0] = 0
-        y[y > 0] = 1
-    y = np.where(np.isnan(y), 0, y)  # No house is built on NaN cells
-
-    return np.array(X), np.array(y), col_names[:-1]
-
-
-def load_x(modifier):
-    df = pd.read_csv(data_url + '/' + modifier + '/testdata.csv')
-    col_names = list(df.columns)
-    X = df.to_numpy()[:, :-1]
-    return np.array(X), col_names[:-1]
-
-
-def load_bg_png(modifier):
-    bg_png = data_url + '/' + modifier + '/bg' + '.png'
-    if Path(bg_png).is_file():
-        # with rasterio.open(bg_tiff) as f:  # Write raster data to disk
-        #     bg = f.read(1)
-        bg = mpimg.imread(bg_png)
-    else:
-        bg = np.zeros((10, 10))
-        bg += 1e-4
-    return bg
+    def get_y(self):
+        return self.y
 
 
-def load_bg(modifier):
-    bg_png = data_url + '/' + modifier + '/bg.tif'
-    if Path(bg_png).is_file():
-        # with rasterio.open(bg_tiff) as f:  # Write raster data to disk
-        #     bg = f.read(1)
-        # with rasterio.open(bg_png) as f:  # Read raster data from disk
-        #     data = f.read()
-        bg = Image.open(bg_png)
-    else:
-        # bg = np.zeros((10, 10))
-        # bg += 1e-4
-        bg = load_bg_png(modifier)
-    return bg
+def preprocess_input(train_loader, test_loader, lnglat=True):
+    X_train = train_loader.X
+    y_train = train_loader.y
+    col_names = train_loader.col_names
 
-
-def preprocess_input(X_train, y_train, X_test, col_names):
-    lnglat = 0  # 0 includes lng,lat. 2 is excluding.
+    X_test = test_loader.X
+    lnglat = 0 if lnglat else 2  # 0 includes lng,lat. 2 is excluding.
     trainLngLat = X_train[:, :2]
     testLngLat = X_test[:, :2]
 
@@ -138,3 +115,19 @@ def preprocess_input(X_train, y_train, X_test, col_names):
     X_test_feats = X_test[:, lnglat:]
     col_names = col_names[lnglat:]
     return X_train, y_train, X_test_feats, trainLngLat, testLngLat, test_nans, col_names
+
+
+# def preprocess_input(train_loader, test_loader, X_train, y_train, X_test, col_names, lnglat=True):
+#     lnglat = 0 if lnglat else 2  # 0 includes lng,lat. 2 is excluding.
+#     trainLngLat = X_train[:, :2]
+#     testLngLat = X_test[:, :2]
+#
+#     X_train = X_train[y_train != 0]
+#     X_train = X_train[:, lnglat:]
+#     y_train = y_train[y_train != 0]
+#
+#     test_nans = np.isnan(X_test).any(axis=1)
+#     X_test = X_test[~test_nans]
+#     X_test_feats = X_test[:, lnglat:]
+#     col_names = col_names[lnglat:]
+#     return X_train, y_train, X_test_feats, trainLngLat, testLngLat, test_nans, col_names

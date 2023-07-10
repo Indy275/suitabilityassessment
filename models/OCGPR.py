@@ -167,69 +167,84 @@ class OCGP():
 
 
 def run_model(train_mod, test_mod, train_size, test_size):
-    X_train, y_train, train_col_names = data_loader.load_xy(train_mod, model='hist_buildings')
-    X_test, test_col_names = data_loader.load_x(test_mod)
+    train_loader = data_loader.DataLoader(train_mod, model='hist_buildings')
+    test_loader = data_loader.DataLoader(test_mod, model='testdata')
+
+    X_train, y_train, train_lnglat, train_col_names = train_loader.preprocess_input()
+    X_test, test_nans, test_lnglat, test_col_names = test_loader.preprocess_input()
+
+    bg_test = test_loader.load_bg()
     assert train_col_names == test_col_names
-    bg_test = data_loader.load_bg(test_mod)
 
     if plot_data:
-        bg_train = data_loader.load_bg(train_mod)
+        bg_train = train_loader.load_bg()
         plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
-
-    X_train, y_train, X_test, trainLngLat, testLngLat, test_nans, col_names = data_loader.preprocess_input(X_train, y_train, X_test,
-                                                                                          train_col_names)
-
     kernel, v, N, svar, ls, p = set_hypers()
 
-    # for part in partitions:
-    fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
-    name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
+    y_preds = np.zeros((test_size, test_size, 4))
 
-    ocgp = OCGP()
+    X_test = np.reshape(X_test, (test_size, test_size, -1))
+    half_size = test_size/2
+    partitions = [X_test[:half_size, :half_size],
+                  X_test[:half_size, half_size:],
+                  X_test[half_size:, :half_size],
+                  X_test[half_size:, half_size:]]
 
-    if kernel == "se":
-        title = f'SE kernel with ls={ls}, svar={svar}'
-        ocgp.seKernel(X_train, X_test, ls, svar)
-    elif kernel == "adaptive":
-        ls = ocgp.adaptiveHyper(X_train, p)
-        ls = np.log(ls)
-        title = f'Adaptive hyper with svar={svar}, p={p}, and learned ls={ls}'
-        # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
-        ocgp.adaptiveKernel(X_train, X_test, ls, svar)
-    elif kernel == "scaled":
-        # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
-        meanDist_xn, meanDist_yn = ocgp.scaledHyper(X_train, X_test, N)
-        title = f'Scaled hyper with svar={svar}, v={v}, N={N}'
-        ocgp.scaledKernel(X_train, X_test, v, meanDist_xn, meanDist_yn, svar)
-    else:
-        print(f'Not implemented: {kernel=}')
-        return
+    for part in range(len(partitions)):
+        train_part_loader = data_loader.DataLoader(train_mod, model='hist_buildings')
+        test_part_loader = data_loader.DataLoader(test_mod, model='testdata')
+        X_train, y_train, train_lnglat, train_col_names = train_part_loader.preprocess_input()
+        X_test, test_nans, test_lnglat_part, test_col_names = test_part_loader.preprocess_input()
 
-    modes = ['mean', 'var', 'pred', 'ratio']
-    titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
-              r'log. moment ratio $\mu_*/\sigma_*$']
+        ocgp = OCGP()
 
-    X1 = testLngLat[:, 0]
-    X2 = testLngLat[:, 1]
-    cmap = plot.set_colmap()
-    cmap.set_bad('tab:blue')
+        if kernel == "se":
+            title = f'SE kernel with ls={ls}, svar={svar}'
+            ocgp.seKernel(X_train, X_test, ls, svar)
+        elif kernel == "adaptive":
+            ls = ocgp.adaptiveHyper(X_train, p)
+            ls = np.log(ls)
+            title = f'Adaptive hyper with svar={svar}, p={p}, and learned ls={ls}'
+            # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
+            ocgp.adaptiveKernel(X_train, X_test, ls, svar)
+        elif kernel == "scaled":
+            # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
+            meanDist_xn, meanDist_yn = ocgp.scaledHyper(X_train, X_test, N)
+            title = f'Scaled hyper with svar={svar}, v={v}, N={N}'
+            ocgp.scaledKernel(X_train, X_test, v, meanDist_xn, meanDist_yn, svar)
+        else:
+            print(f'Not implemented: {kernel=}')
+            return
 
-    for i in range(len(modes)):
-        y_preds = np.zeros((test_nans.shape[0], 3))  # (:, lon, lat, y_pred, y_var)
-        y_preds[:, :2] = testLngLat[:, :2]  # test x and y
-        y_preds[test_nans, 2] = np.nan
-        print("Creating scores and plotting using",modes[i])
-        y_preds[~test_nans, 2] = np.squeeze(np.array(ocgp.getGPRscore(modes[i])))
-        score = y_preds[:, 2]
-        if plot_pred:
+        modes = ['mean', 'var', 'pred', 'ratio']
+        y_preds_part = np.zeros((X_test.shape[0], 4))
+        for i in range(len(modes)):
+            print("Creating scores and plotting using",modes[i])
+
+            y_preds_part[test_nans, :] = np.nan
+            y_preds_part[:, i] = np.squeeze(np.array(ocgp.getGPRscore(modes[i])))
+        y_preds_part = y_preds_part.reshape((test_size, test_size, 4))
+        if part == 0: y_preds[:half_size, :half_size, :] = y_preds_part
+        elif part == 1: y_preds[:half_size, half_size:, :] = y_preds_part
+        elif part == 2: y_preds[half_size:, :half_size, :] = y_preds_part
+        elif part == 3: y_preds[half_size:, half_size:, :] = y_preds_part
+
+    if plot_pred:
+        titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
+                  r'log. moment ratio $\mu_*/\sigma_*$']
+        fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
+        name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
+
+        for i in range(len(titles)):
+            X1 = test_lnglat[:, 0]
+            X2 = test_lnglat[:, 1]
+            cmap = plot.set_colmap()
+            cmap.set_bad('tab:blue')
             ax = plt.subplot(2, 2, i + 1)
             ax.imshow(bg_test, extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], origin='upper')
-            # plt.imshow(score.reshape((test_size, test_size)), vmin=np.nanmin(score), cmap=cmap, alpha=0.7,
-            #                 vmax=np.nanmax(score), extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], aspect='auto')
-            plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
+            plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, i].reshape((test_size, test_size)),
                          cmap=cmap, origin='upper', alpha=0.65)
             ax.set_title(titles[i])
-    if plot_pred:
         plt.suptitle(title)
         plt.tight_layout()
         plt.savefig(name, bbox_inches='tight')

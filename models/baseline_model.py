@@ -70,41 +70,42 @@ def eval_model(y_test, y_preds, test_vals):
 
 
 def run_model(train_mod, test_mod, model, train_size, test_size, ref_std):
-    X_train, y_train, train_col_names = data_loader.load_xy(train_mod, model=ref_std)
-    X_test, test_col_names = data_loader.load_x(test_mod)
+    train_loader = data_loader.DataLoader(train_mod, model)
+    test_loader = data_loader.DataLoader(test_mod, model='testdata')
+
+    X_train, y_train, train_lnglat, train_col_names = train_loader.preprocess_input()
+    X_test, test_nans, test_lnglat, test_col_names = test_loader.preprocess_input()
+
+    bg_test = test_loader.load_bg()
     assert train_col_names == test_col_names
-    bg_test = data_loader.load_bg(test_mod)
 
     if plot_data:
-        bg_train = data_loader.load_bg(train_mod)
+        bg_train = train_loader.load_bg()
         plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
 
-    X_train, y_train, X_test, trainLngLat, testLngLat, test_nans, col_names = data_loader.preprocess_input(X_train,
-                                                                                                           y_train,
-                                                                                                           X_test,
-                                                                                                           train_col_names)
+
     # ind = [5]
     # ind = [0, 1]  # Longitude, Latitude
     # X_train = X_train[:, ind]  # temp
     # X_test = X_test[:, ind]  # temp
     # col_names = col_names[ind]  # temp
     print(f'Training model. Train shape: {X_train.shape}. Test shape: {X_test.shape}')
-    print(f'Train variables: {col_names}')
+    print(f'Train variables: {train_col_names}')
 
     predictor, feature_imp = train(X_train, y_train, model)
-    y_preds = predict(testLngLat, X_test, test_nans, test_mod, model, predictor)
+    y_preds = predict(test_lnglat, X_test, test_nans, test_mod, model, predictor)
 
     if plot_pred:
         fig_url = f'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
         fig_name = fig_url + test_mod + '_' + train_mod + '_' + model
 
         if train_mod == test_mod and ref_std == 'expert_ref':
-            train_labs = np.column_stack([trainLngLat[:, 0], trainLngLat[:, 1], y_train])
+            train_labs = np.column_stack([train_lnglat[:, 0], train_lnglat[:, 1], y_train])
             plot.plot_prediction(y_preds, test_size, fig_name, train_labs, contour=False, bg=bg_test)
         else:
             plot.plot_prediction(y_preds, test_size, fig_name, contour=False, bg=bg_test)
 
     if plot_feature_importance:
-        plot.plot_f_importances(feature_imp, col_names)
-        save_imp(feature_imp, col_names, model, test_mod)
+        plot.plot_f_importances(feature_imp, train_col_names)
+        save_imp(feature_imp, train_col_names, model, test_mod)
 
