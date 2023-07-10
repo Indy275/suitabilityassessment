@@ -170,17 +170,18 @@ def run_model(train_mod, test_mod, train_size, test_size):
     X_train, y_train, train_col_names = data_loader.load_xy(train_mod, model='hist_buildings')
     X_test, test_col_names = data_loader.load_x(test_mod)
     assert train_col_names == test_col_names
-    bg = data_loader.load_bg(test_mod)
+    bg_test = data_loader.load_bg(test_mod)
+
+    if plot_data:
+        bg_train = data_loader.load_bg(train_mod)
+        plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
 
     X_train, y_train, X_test, trainLngLat, testLngLat, test_nans, col_names = data_loader.preprocess_input(X_train, y_train, X_test,
                                                                                           train_col_names)
-    if plot_data:
-        bg_train = data_loader.load_bg(train_mod)
-        bg_test = data_loader.load_bg(test_mod)
-        plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
 
     kernel, v, N, svar, ls, p = set_hypers()
 
+    # for part in partitions:
     fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
     name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
 
@@ -222,7 +223,7 @@ def run_model(train_mod, test_mod, train_size, test_size):
         score = y_preds[:, 2]
         if plot_pred:
             ax = plt.subplot(2, 2, i + 1)
-            ax.imshow(bg, extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], origin='upper')
+            ax.imshow(bg_test, extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], origin='upper')
             # plt.imshow(score.reshape((test_size, test_size)), vmin=np.nanmin(score), cmap=cmap, alpha=0.7,
             #                 vmax=np.nanmax(score), extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], aspect='auto')
             plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
