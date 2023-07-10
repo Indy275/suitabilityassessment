@@ -1,6 +1,5 @@
 import json
 import os.path
-import shutil
 import requests
 import configparser
 from joblib import dump
@@ -10,10 +9,8 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
-import matplotlib.pyplot as plt
 import rasterio
 from rasterio import features, mask
-from scipy.stats import zscore
 from sklearn.preprocessing import StandardScaler
 
 config = configparser.ConfigParser()
@@ -21,8 +18,8 @@ config.read('config.ini')
 
 data_url = config['DEFAULT']['data_url']
 json_headers = json.loads(config['DEFAULT']['json_headers'])
-recreate_labs = True  # Always (re)create y-labels: something might have changed in the base layer
-recreate_feats = False  # Always (re)create x-feats: something might have changed in the base layer
+recreate_labs = config.getboolean('DATA_SETTINGS', 'recreate_labs')
+recreate_feats = config.getboolean('DATA_SETTINGS', 'recreate_feats')
 
 
 def get_raster_data(raster_url, modifier, name, bbox, size):
@@ -41,7 +38,7 @@ def get_raster_data(raster_url, modifier, name, bbox, size):
                     f.write(data)
 
         gdf = gpd.read_file(data_url + '/water_shp/invertedwatergangHHNK.shp')
-        nodata_val = -99999
+        nodata_val = -9999
         with rasterio.open(geotiff_name) as src:  # Read raster data from disk
 
             raster_data = src.read()
@@ -89,8 +86,14 @@ def get_labels(model, modifier, copy):
             gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.Lng, df.Lat))
             shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['Value'])]
 
-        elif model == 'hist_buildings' and modifier.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:
-            gdf = gpd.read_file(data_url + "/waterland1900min.shp")
+        elif model == 'hist_buildings':
+            if modifier.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:
+                hist_bld_source = 'waterland1900min'
+            elif modifier.lower() in ['noordholland', 'noordhollandhires']:
+                hist_bld_source = 'HHNKpre1900filtered'
+            else:
+                print(f'There was an incompatibility issue: {model=} {modifier=}')
+            gdf = gpd.read_file(data_url + f'/{hist_bld_source}.shp')
             gdf.to_crs(crs='EPSG:4326', inplace=True)
             gdf['value'] = 1
             shapes = ((geom, value) for geom, value in zip(gdf['geometry'], gdf['value']))
@@ -140,7 +143,7 @@ def get_fav_data(modifier, model, bbox, size, test):
     if not test:
         label_data = get_labels(model, modifier, copy=col_names[-2])
     else:  # test data -> no labels
-        label_data = np.zeros((size,size))
+        label_data = np.zeros((size, size))
 
     combined_sources.append(label_data)
     col_names.append(model.strip())
@@ -153,13 +156,10 @@ def create_df(modifier, bbox, size, model, test=False):
         os.makedirs(data_url + '/rasters/' + modifier)
 
     if modifier.lower().startswith(('ws', 'oc')) and model == 'expert_ref' and not test:
-        if modifier[-3:] == 'all':
-            all_exp_scores = pd.read_csv(data_url + f'/expertscoresall_{modifier[:-3]}.csv', header=[0])
-        else:
-            all_exp_scores = pd.read_csv(data_url + f'/expertscores2_{modifier}.csv', header=[0])
+        expert_scores = pd.read_csv(data_url + f'/expertscores_{modifier.lower()}.csv', header=[0])
         exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
-        point_info_scores = all_exp_scores.merge(exp_point_info, on='Point', how='left',
-                                                 suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
+        point_info_scores = expert_scores.merge(exp_point_info, on='Point', how='left',
+                                                suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
         y = point_info_scores['Value'].to_numpy()
         point_info_scores.drop(['Value', 'Std', 'Point', 'Unnamed: 0'], axis=1, inplace=True, errors='ignore')
         col_names = list(point_info_scores.columns)
@@ -180,21 +180,16 @@ def create_df(modifier, bbox, size, model, test=False):
 
     # Normalize the features (without normalizing location and labels)
     ss = StandardScaler()
-    loc_data = data[:, :2]
-    feats_data = ss.fit_transform(data[:, 2:-1])
+    feats_data = ss.fit_transform(data[:, :-1])
     labs_data = data[:, -1]
-    data_conc = np.concatenate((loc_data, feats_data, labs_data.reshape((-1, 1))), axis=1)
+    data_conc = np.concatenate((feats_data, labs_data.reshape((-1, 1))), axis=1)
 
     df = pd.DataFrame(data_conc, columns=col_names)
 
-    # Change outlier values: more than 3 standard deviations from mean are set to 95% percentile
-    # if test:
+    # Change outlier values: cut-off at threshold
+    thresholds = [7, 4, 80, .5, 2]  # 7m primary; 4m regional; 80mm subsidence; .5m waterdepth; 2m soil capacity
     for i, column in enumerate(df.columns[2:-1]):
-        threshold = np.nanmedian(df[column])#np.nanpercentile(df[column], 95)
-        mask = zscore(df[column], nan_policy='omit') > 6
-        # print(f'Column {column} has {sum(mask)} values outside 6 standard deviations ({sum(mask)/len(mask)}%)')
-        # print(f'For those {sum(mask)} rows, changed the value to {threshold}')
-        df.loc[mask, column] = threshold
+        df.loc[df[column] > thresholds[i], column] = thresholds[i]
 
     if not test:
         df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
