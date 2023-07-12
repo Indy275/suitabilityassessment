@@ -17,8 +17,8 @@ def plot_prediction(y_pred, height, figname, train_labs=None, contour=True, bg=N
     plot_pred.plot_prediction(y_pred, height, figname, train_labs=train_labs, contour=contour, bg=bg, savefig=savefig)
 
 
-def plot_y_expert(test_mod, X, y, bg):
-    plot_data.plot_y_expert(test_mod, X, y, bg)
+def plot_y_expert(mod, lnglat, y, bg):
+    plot_data.plot_y_expert(mod, lnglat, y, bg)
 
 
 def plot_loss(loss):

@@ -3,10 +3,15 @@ from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 from textwrap import wrap
 import matplotlib as mpl
+import pandas as pd
+
+from shapely.geometry import Point
+from collections import Counter
 
 
 def set_colmap():
-    colmap = LinearSegmentedColormap.from_list('colmap2', [[1, 0, 0, 1], [145 / 255, 210 / 255, 80 / 255, 1]])
+    colmap = LinearSegmentedColormap.from_list('colmap2', [[1, 0, 0, 1], [145 / 255, 210 / 255, 80 / 255, 1]]) # label
+    # colmap = LinearSegmentedColormap.from_list('colmap2', [[145 / 255, 210 / 255, 80 / 255, 1], [1, 0, 0, 1]])  # msk
     try:
         plt.register_cmap(cmap=colmap)
     except:
@@ -39,9 +44,7 @@ def plot_prediction(y_preds, test_size, fig_name, train_labs=None, contour=True,
         width, height = bg.size
     except:
         width, height = bg.shape[0], bg.shape[1]
-    ratio = width / height
-    ratio2 = height / width
-    print(ratio, ratio2)
+    ratio = height / width
     plt.imshow(bg, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper', aspect=ratio)
     if not contour:
         plt.imshow(y_preds[:, 2].reshape((test_size, test_size)), alpha=0.65, cmap=cmap,
@@ -53,7 +56,13 @@ def plot_prediction(y_preds, test_size, fig_name, train_labs=None, contour=True,
         fig_name += '_contour'
 
     if train_labs is not None:
-        plt.scatter(train_labs[:, 0], train_labs[:, 1], c=train_labs[:, 2], s=25, edgecolors='black')
+        points = [Point(x1, x2) for x1, x2 in train_labs[:, :2]]
+        point_counts = Counter(points)
+        df = pd.DataFrame([
+            {'X1': p.x, 'X2': p.y, 'y': train_labs[i, 2], 'Count': point_counts[Point(p.x, p.y)]}
+            for i, p in enumerate(points)])
+
+        plt.scatter(df['X1'], df['X2'], c=df['y'], cmap=cmap, s=df['Count'] * 25, edgecolors='black')
 
     plt.xlabel('Longitude')
     plt.ylabel('Latitude')

@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 import plotting.plot
+from shapely.geometry import Point
+from collections import Counter
 
 
 def plot_xy(X_train, y_train, X_test, y_test, train_h, train_w, test_h, test_w):
@@ -49,15 +52,25 @@ def plot_y(y_train, bg_train, bg_test, train_size, test_size):
     plt.show()
 
 
-def plot_y_expert(mod, X, y, bg):
+def plot_y_expert(mod, lnglat, y, bg):
     fig, ax = plt.subplots()
     cmap = plotting.plot.set_colmap()
     ax.imshow(bg, extent=[4.8281, 5.0457, 52.5892, 52.714], origin='upper', alpha=0.8)
-    for x0, x1, yi in zip(X[:, 0], X[:, 1], y):
-        print(f'({x0},{x1}): {yi}')
-    ax.scatter(X[:, 0], X[:, 1], c=y, cmap=cmap, s=50)
 
-    posperc = len(y[y != 0]) / len(y) * 100
-    ax.set_title("{} labels: {} positive ({:.2f}%)".format(mod, len(y[y != 0]), posperc))
+    # df = pd.DataFrame([{'X1':x1, 'X2': x2} for x1, x2 in lnglat[:, :2]])
+    # print( df.groupby(['X1','X2']).value_counts())
+    # df['Count'] = df.groupby(['X1','X2']).count()
+    # print(df.groupby(['X1','X2']).mean())
+    # df['y'] = df.groupby(['X1','X2']).mean()
+    #
+    # print(df['Count'])
+
+    points = [Point(x1, x2) for x1, x2 in lnglat[:, :2]]
+    point_counts = Counter(points)
+
+    df = pd.DataFrame([{'X1': p.x, 'X2': p.y, 'y':y[i],'Count': point_counts[Point(p.x, p.y)]} for i, p in enumerate(points)])
+    ax.scatter(df['X1'], df['X2'], c=df['y'], cmap=cmap, s=df['Count']*25, edgecolors='black')
+
+    ax.set_title("{} labels: {} data points".format(mod, len(y[y != 0])))
     # ax.tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False)
     plt.show()
