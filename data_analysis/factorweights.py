@@ -29,7 +29,7 @@ data.dropna(subset=['Q1'], inplace=True)  # Drop all reports in which question w
 for col in ['Q2_5', 'Q2_4', 'Q2_3', 'Q2_2', 'Q2_1']:
     data[col] = pd.to_numeric(data[col])
     data[col] = np.where(data[col] == 1, 0, data[col])
-    data[col] = np.where(data[col] == 6, 1, data[col])  # Qualtrics error: 'Een beetje belangrijk' is seen as 6
+    data[col] = np.where(data[col] == 6, 1, data[col])  # Qualtrics error: 'Een beetje belangrijk' received value 6
 
 arit_means, geom_means, medians, stds = [], [], [], []
 for col in ['Q2_1', 'Q2_2', 'Q2_3', 'Q2_4', 'Q2_5']:
@@ -61,7 +61,7 @@ ylabels = ['Not important',
            'Quite important',
            'Extremely important',
            'Absolutely important']
-ylabels = ['\n'.join(wrap(x, 10)) for x in ylabels]
+ylabels = ['\n'.join(wrap(y, 10)) for y in ylabels]
 fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/'
 fig_name = fig_url + cluster + '_factorweights'
 

@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import configparser
 import os
-from functools import reduce
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
@@ -88,7 +87,7 @@ def read_dp_csv(cluster):
 
 
 def read_survey_data(name, date):
-    df = pd.read_csv(data_url + '/collected_data/{}.csv'.format(name))
+    df = pd.read_csv(data_url + '/{}.csv'.format(name))
     df = df.iloc[2:]
     df = df[pd.to_datetime(df['EndDate']) > pd.to_datetime(date)]
     df.columns = [c.replace(' ', '_') for c in df.columns]
