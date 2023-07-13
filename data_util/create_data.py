@@ -11,6 +11,8 @@ import geopandas as gpd
 
 import rasterio
 from rasterio import features, mask
+from shapely import Polygon
+from pyproj import Transformer
 from sklearn.preprocessing import StandardScaler
 
 config = configparser.ConfigParser()
@@ -20,6 +22,41 @@ data_url = config['DEFAULT']['data_url']
 json_headers = json.loads(config['DEFAULT']['json_headers'])
 recreate_labs = config.getboolean('DATA_SETTINGS', 'recreate_labs')
 recreate_feats = config.getboolean('DATA_SETTINGS', 'recreate_feats')
+
+
+def concoo(d0_loc):  # convert_coordinates
+    # inProj = Proj(init='epsg:4326')  # world coordinates
+    # outProj = Proj(init='epsg:28992')  # Dutch coordinates
+    # d0_x0, d0_x1 = transform(inProj,outProj, d0_loc[0], d0_loc[1])
+    # transformer = Transformer.from_crs("EPSG:4326", "EPSG:28992")
+    transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857")
+    d0_x0, d0_x1 = transformer.transform(d0_loc[1], d0_loc[0])
+    return (d0_x0, d0_x1)
+
+
+def create_bg(mod, bbox):
+    bbox = [float(i[0:-1]) for i in bbox.split()]
+    NH_w = 5.37725914616264 - 4.52690620343425  # MaxLng - minLng
+    NH_h = 53.21427409446518 - 52.36877567446727  # maxLat - minLat
+    poly_bbox = (concoo([bbox[0], bbox[3]]), concoo([bbox[2], bbox[3]]),concoo([bbox[2], bbox[1]]),concoo([bbox[0], bbox[1]]))
+    poly = Polygon(poly_bbox)
+    with rasterio.open(data_url+'/background.tif') as src:  # Read raster data from disk
+        arr = src.read(1)
+        orig_h = arr.shape[0]
+        orig_w = arr.shape[1]
+        raster_meta = src.meta
+        clipped_dataset, out_transform = rasterio.mask.mask(src, [poly], crop=True)
+
+    h = int(round(orig_h * abs(bbox[1]-bbox[3]) / NH_h))
+    w = int(round(orig_w * abs(bbox[0]-bbox[2]) / NH_w))
+    raster_meta.update({
+        'height': h,
+        'width': w,
+        'crs': src.crs,
+    })
+
+    with rasterio.open(data_url+f'/{mod}/bg.tif', 'w', **raster_meta) as dst:  # Write data masked with watergangen
+        dst.write(clipped_dataset)
 
 
 def get_raster_data(raster_url, modifier, name, bbox, size):
@@ -81,7 +118,7 @@ def get_labels(model, modifier, copy):
     if (not Path(geotiff_name).is_file()) or recreate_labs:  # if it doesn't yet exist, or if we want to recreate anyway
         print(f'(Re)creating layer; retrieving {model} labels')
 
-        if model == 'expert_ref' and modifier.lower() in ['oc', 'ws']:
+        if model == 'expert_ref':
             df = pd.read_csv(data_url + '/expertscores_{}.csv'.format(modifier), header=[0])
             gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.Lng, df.Lat))
             shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['Value'])]
@@ -147,7 +184,31 @@ def get_fav_data(modifier, model, bbox, size, test):
 
     combined_sources.append(label_data)
     col_names.append(model.strip())
-    return np.array(combined_sources), col_names
+
+    data = np.array(combined_sources)
+
+    # NaN values are explicitly set to NaN instead of -9999
+    data[data < -9000] = np.nan
+
+    # (n_feat, w, h) -> (w x h, n_feat)
+    data = np.transpose(data, (1, 2, 0))
+    data = np.reshape(data, (-1, data.shape[-1]))
+
+    return data, col_names
+
+
+def get_expert_data(modifier):
+    expert_scores = pd.read_csv(data_url + f'/expertscores_{modifier.lower()}.csv', header=[0])
+    exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
+    point_info_scores = expert_scores.merge(exp_point_info, on='Point', how='left',
+                                            suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
+    y = point_info_scores['Value'].to_numpy()
+    point_info_scores.drop(['Value', 'Std', 'Point', 'Unnamed: 0'], axis=1, inplace=True, errors='ignore')
+    col_names = list(point_info_scores.columns)
+    col_names.append("expert_ref")
+    X = point_info_scores.to_numpy()
+    data = np.concatenate((X, y.reshape((-1, 1))), axis=1)
+    return data, col_names
 
 
 def create_df(modifier, bbox, size, model, test=False):
@@ -155,30 +216,20 @@ def create_df(modifier, bbox, size, model, test=False):
         os.makedirs(data_url + '/' + modifier)
         os.makedirs(data_url + '/rasters/' + modifier)
 
-    if modifier.lower().startswith(('ws', 'oc')) and model == 'expert_ref' and not test:
-        expert_scores = pd.read_csv(data_url + f'/expertscores_{modifier.lower()}.csv', header=[0])
-        exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
-        point_info_scores = expert_scores.merge(exp_point_info, on='Point', how='left',
-                                                suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
-        y = point_info_scores['Value'].to_numpy()
-        point_info_scores.drop(['Value', 'Std', 'Point', 'Unnamed: 0'], axis=1, inplace=True, errors='ignore')
-        col_names = list(point_info_scores.columns)
-        col_names.append("expert_ref")
-        X = point_info_scores.to_numpy()
-        data = np.concatenate((X, y.reshape((-1, 1))), axis=1)
+    if model == 'expert_ref' and not test:
+        data, col_names = get_expert_data(modifier)
 
     else:
-        # Retrieve layer data based on a favourite instance
         data, col_names = get_fav_data(modifier, model, bbox, size, test=test)
 
-        # NaN values are explicitly set to NaN instead of -9999
-        data[data < -9000] = np.nan
-
-        # (n_feat, w, h) -> (w x h, n_feat)
-        data = np.transpose(data, (1, 2, 0))
-        data = np.reshape(data, (-1, data.shape[-1]))
+    # Change outlier values: cut-off at threshold
+    df = pd.DataFrame(data, columns=col_names)
+    thresholds = [7, 4, 80, .5, 2]  # 7m primary; 4m regional; 80mm subsidence; .5m waterdepth; 2m soil capacity
+    for i, column in enumerate(df.columns[2:-1]):
+        df.loc[df[column] > thresholds[i], column] = thresholds[i]
 
     # Normalize the features (without normalizing location and labels)
+    data = df.to_numpy()
     ss = StandardScaler()
     feats_data = ss.fit_transform(data[:, :-1])
     labs_data = data[:, -1]
@@ -186,17 +237,8 @@ def create_df(modifier, bbox, size, model, test=False):
 
     df = pd.DataFrame(data_conc, columns=col_names)
 
-    # Change outlier values: cut-off at threshold
-    thresholds = [7, 4, 80, .5, 2]  # 7m primary; 4m regional; 80mm subsidence; .5m waterdepth; 2m soil capacity
-    for i, column in enumerate(df.columns[2:-1]):
-        df.loc[df[column] > thresholds[i], column] = thresholds[i]
+    ref_std = 'testdata' if test else model
+    df.to_csv(data_url + '/' + modifier + "/" + ref_std + ".csv", index=False)
+    dump(ss, data_url + '/' + modifier + "/" + ref_std + "_scaler.joblib")
+    print("Data with shape {} saved to {}/{}.csv".format(data_conc.shape, modifier, ref_std))
 
-    if not test:
-        df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
-        dump(ss, data_url + '/' + modifier + "/" + model + "_scaler.joblib")
-        print("Data with shape {} saved to {}/{}.csv".format(data_conc.shape, modifier, model))
-
-    else:
-        df.to_csv(data_url + '/' + modifier + "/testdata.csv", index=False)
-        dump(ss, data_url + '/' + modifier + "/testdata_scaler.joblib")
-        print("Data with shape {} saved to {}/testdata.csv".format(data_conc.shape, modifier))

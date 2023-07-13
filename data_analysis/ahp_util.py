@@ -82,7 +82,7 @@ def compute_priority_weights_aggregate(matrix):
 
 
 def read_dp_csv(cluster):
-    df = pd.read_csv(data_url + "/expertscores_{}.csv".format(cluster))
+    df = pd.read_csv(data_url + "/expert_point_info_{}.csv".format(cluster))
     return df['Point'], df['Lng'], df['Lat']
 
 

@@ -7,37 +7,49 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 
+from data_util import create_data
+
 config = configparser.ConfigParser()
 parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
-coords_as_features = config.getboolean('DATA_SETTINGS','coords_as_features')
+coords_as_features = config.getboolean('DATA_SETTINGS', 'coords_as_features')
 
 
 class DataLoader:
-    def __init__(self, modifier, model):
+    def __init__(self, modifier, ref_std):
         self.modifier = modifier
-        self.model = model  # hist_buildings, expert_ref or testdata
-        self.X = None
-        self.lnglat = None
+        self.ref_std = ref_std  # hist_buildings, expert_ref or testdata
+        self.X = None  # (x, y, features)
+        self.lnglat = None  # (x, y)
         self.col_names = None
         self.y = None
+        self.bbox = None
+        self.size = None
         self.load_data()
+        self.load_meta()
+        self.X_orig = self.load_orig_df()
 
     def load_orig_df(self):
         # load and reverse apply scaler
-        ss = load(data_url + '/' + self.modifier + "/" + self.model + "_scaler.joblib")
+        ss = load(data_url + '/' + self.modifier + "/" + self.ref_std + "_scaler.joblib")
         df_orig = ss.inverse_transform(self.X)
+        self.lnglat = df_orig[:, :2]
         return df_orig
 
+    def load_meta(self):
+        df = pd.read_csv(data_url + '/metadata.csv', delimiter=';', index_col='modifier')
+        row = df.loc[self.modifier]
+        self.bbox = row['bbox']
+        self.size = row['size']
+
     def load_data(self):
-        df = pd.read_csv(data_url + '/' + self.modifier + '/' + self.model + '.csv')
+        df = pd.read_csv(data_url + '/' + self.modifier + '/' + self.ref_std + '.csv')
         col_names = list(df.columns)
-        X_lnglat_feat = df.to_numpy()[:, :-1]
-        self.X = np.array(X_lnglat_feat[:, 2:])
-        self.lnglat = np.array(X_lnglat_feat[:, :2])
-        y = df[:, -1]
-        if self.model == 'hist_buildings':
+        self.X = np.array(df.to_numpy()[:, :-1])
+        # self.lnglat = np.array(self.X[:, :2])
+        y = df.to_numpy()[:, -1]
+        if self.ref_std == 'hist_buildings':
             y[y < 0] = 0
             y[y > 0] = 1
         y = np.where(np.isnan(y), 0, y)  # No house is built on NaN cells
@@ -67,26 +79,18 @@ class DataLoader:
         return X, y, self.lnglat, col_names
 
     def preprocess_input(self):
-        if self.model == 'testdata':
+        if self.ref_std == 'testdata':
             return self._preprocess_test()
-        elif self.model in ['hist_buildings', 'expert_ref']:
+        elif self.ref_std in ['hist_buildings', 'expert_ref']:
             return self._preprocess_train()
-
-    def load_bg_png(self):
-        bg_png = data_url + '/' + self.modifier + '/bg' + '.png'
-        if Path(bg_png).is_file():
-            bg = mpimg.imread(bg_png)
-        else:
-            bg = np.zeros((10, 10))
-            bg += 1e-4
-        return bg
 
     def load_bg(self):
         bg_png = data_url + '/' + self.modifier + '/bg.tif'
-        if Path(bg_png).is_file():
-            bg = Image.open(bg_png)
-        else:
-            bg = self.load_bg_png()
+        # bg_png = data_url + '/' + self.modifier + '/msk6.tiff'
+
+        if not Path(bg_png).is_file():
+            create_data.create_bg(self.modifier, self.bbox)
+        bg = Image.open(bg_png)
         return bg
 
     def get_xy(self):
@@ -94,6 +98,9 @@ class DataLoader:
 
     def get_y(self):
         return self.y
+
+    def get_x(self):
+        return self.X
 
 
 def preprocess_input(train_loader, test_loader, lnglat=True):
@@ -115,19 +122,3 @@ def preprocess_input(train_loader, test_loader, lnglat=True):
     X_test_feats = X_test[:, lnglat:]
     col_names = col_names[lnglat:]
     return X_train, y_train, X_test_feats, trainLngLat, testLngLat, test_nans, col_names
-
-
-# def preprocess_input(train_loader, test_loader, X_train, y_train, X_test, col_names, lnglat=True):
-#     lnglat = 0 if lnglat else 2  # 0 includes lng,lat. 2 is excluding.
-#     trainLngLat = X_train[:, :2]
-#     testLngLat = X_test[:, :2]
-#
-#     X_train = X_train[y_train != 0]
-#     X_train = X_train[:, lnglat:]
-#     y_train = y_train[y_train != 0]
-#
-#     test_nans = np.isnan(X_test).any(axis=1)
-#     X_test = X_test[~test_nans]
-#     X_test_feats = X_test[:, lnglat:]
-#     col_names = col_names[lnglat:]
-#     return X_train, y_train, X_test_feats, trainLngLat, testLngLat, test_nans, col_names

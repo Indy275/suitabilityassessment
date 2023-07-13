@@ -22,6 +22,9 @@ def set_cluster(cluster):
         data_link = 'Bodem en Watersturend OC_May 31, 2023_15.14'
         start_date = datetime.date(2023, 5, 15)
         locationIDs = list('ABCDE')
+    data_link = 'Bodem en Watersturend WS v2_June 9, 2023_09.44'
+    start_date = datetime.date(2023, 5, 23)
+    locationIDs = list('ABCDEFGHIJKLMNOPQRSTUVWXYZab')
     return data_link, start_date, locationIDs
 
 
@@ -33,9 +36,9 @@ def process_experts_indiv(data, locationIDs):
         if len(df_expert.columns) > 28:  # A completed survey has 29 columns: 10 comparisons; 6 other question; 13 metadata
             n_completed_surveys += 1
             matrix = ahp_util.build_matrix(df_expert)
-            points = [df_expert.columns[-10].split('_')[1] + df_expert.columns[-9].split('_')[1][1] +
-                          df_expert.columns[-1].split('_')[1]]
-            weight_dict = {point: 0 for point in locationIDs}
+            points = list(df_expert.columns[-10].split('_')[1] + df_expert.columns[-9].split('_')[1][1] +
+                          df_expert.columns[-1].split('_')[1])
+            weight_dict = dict.fromkeys(locationIDs, 0)
             expertweights = ahp_util.compute_priority_weights(np.squeeze(matrix))
             for point, exp_weight in zip(points, expertweights):
                 weight_dict[point] = exp_weight
@@ -52,8 +55,8 @@ def process_experts_group(data):
         df_expert = expert.to_frame().T.dropna(axis=1, how='all')
         if len(df_expert.columns) > 28:  # A completed survey has 29 columns: 10 comparisons; 6 other question; 13 metadata
             matrix = ahp_util.build_matrix(df_expert)
-            points = [df_expert.columns[-10].split('_')[1] + df_expert.columns[-9].split('_')[1][1] +
-                          df_expert.columns[-1].split('_')[1]]  # Gets the letters of the five locations from column names
+            points = list(df_expert.columns[-10].split('_')[1] + df_expert.columns[-9].split('_')[1][1] +
+                          df_expert.columns[-1].split('_')[1])  # Gets the letters of the five locations from column names
             expertweights = ahp_util.compute_priority_weights(np.squeeze(matrix))
             for point, exp_weight in zip(points, expertweights):
                 weights_dp.append(exp_weight)
