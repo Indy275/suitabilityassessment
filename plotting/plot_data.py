@@ -37,43 +37,56 @@ def plot_row(y, bg, y_t, ax, i, h, w):
     ax[i].yaxis.set_ticklabels([])
 
 
-def plot_y(y_train, bg_train, bg_test, train_size, test_size):
-    fig, ax = plt.subplots(1, 2)
-
-    bg = [bg_train, bg_test]
-    y = [y_train, y_train]  # y_test is usually not available and will not be plotted anyway
-    y_t = ['Train', 'Test']
-    height = [train_size, test_size]
-    width = [train_size, test_size]
-
-    for i, (y_i, b, y_t_i, h, w) in enumerate(zip(y, bg, y_t, height, width)):
-        plot_row(y_i, b, y_t_i, ax, i, h, w)
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_y_expert(mod, lnglat, y, bg):
+def plot_y(loader, bg, ref_std):
+    y = loader.y
+    lnglat = loader.lnglat
+    bbox = loader.bbox
+    print(bbox)
+    bbox = [float(i[0:-1]) for i in bbox.split()]
+    mod = loader.modifier
+    size = loader.size
     fig, ax = plt.subplots()
-    cmap = plotting.plot.set_colmap()
-    ax.imshow(bg, extent=[4.8281, 5.0457, 52.5892, 52.714], origin='upper', alpha=0.8)
+    ax.imshow(bg, extent=[bbox[0], bbox[2], bbox[1], bbox[3]], origin='upper', alpha=0.8)
 
-    # df = pd.DataFrame([{'X1':x1, 'X2': x2} for x1, x2 in lnglat[:, :2]])
-    # print( df.groupby(['X1','X2']).value_counts())
-    # df['Count'] = df.groupby(['X1','X2']).count()
-    # print(df.groupby(['X1','X2']).mean())
-    # df['y'] = df.groupby(['X1','X2']).mean()
-    #
-    # print(df['Count'])
-
-    points = [Point(x1, x2) for x1, x2 in lnglat[:, :2]]
-    point_counts = Counter(points)
-
-    df = pd.DataFrame([{'X1': p.x, 'X2': p.y, 'y': y[i],'Count': point_counts[Point(p.x, p.y)]} for i, p in enumerate(points)])
-    df_mean = df.groupby(['X1', 'X2'])['y'].mean().to_frame(name='y_mean').reset_index()
-    df = df.merge(df_mean, on=['X1', 'X2'], how='left')
-
-    ax.scatter(df['X1'], df['X2'], c=df['y_mean'], cmap=cmap, s=df['Count']*25, edgecolors='black')
+    if ref_std == 'hist_buildings':
+        indices = np.nonzero(y.reshape((size, size)))
+        ax.scatter(indices[1], np.abs(indices[0] - size), s=1, c='r')
+    elif ref_std == 'expert_ref':
+        cmap = plotting.plot.set_colmap()
+        points = [Point(x1, x2) for x1, x2 in lnglat[:, :2]]
+        point_counts = Counter(points)
+        df = pd.DataFrame(
+            [{'X1': p.x, 'X2': p.y, 'y': y[i], 'Count': point_counts[Point(p.x, p.y)]} for i, p in enumerate(points)])
+        df_mean = df.groupby(['X1', 'X2'])['y'].mean().to_frame(name='y_mean').reset_index()
+        df = df.merge(df_mean, on=['X1', 'X2'], how='left')
+        ax.scatter(df['X1'], df['X2'], c=df['y_mean'], cmap=cmap, s=df['Count'] * 25, edgecolors='black')
 
     ax.set_title("{} labels: {} data points".format(mod, len(y[y != 0])))
-    # ax.tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False)
+
+    plt.tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False)
+    ax.yaxis.set_ticklabels([])
     plt.show()
+
+
+# def plot_y_expert(loader, bg):
+#     lnglat = loader.lnglat
+#     bbox = loader.bbox
+#     y = loader.y
+#     mod = loader.modifier
+#     fig, ax = plt.subplots()
+#     cmap = plotting.plot.set_colmap()
+#     bbox = [float(i[0:-1]) for i in bbox.split()]
+#
+#     ax.imshow(bg, extent=[bbox[0], bbox[2], bbox[1], bbox[3]], origin='upper', alpha=0.8)
+#
+#     points = [Point(x1, x2) for x1, x2 in lnglat[:, :2]]
+#     point_counts = Counter(points)
+#     df = pd.DataFrame([{'X1': p.x, 'X2': p.y, 'y': y[i],'Count': point_counts[Point(p.x, p.y)]} for i, p in enumerate(points)])
+#     df_mean = df.groupby(['X1', 'X2'])['y'].mean().to_frame(name='y_mean').reset_index()
+#     df = df.merge(df_mean, on=['X1', 'X2'], how='left')
+#
+#     ax.scatter(df['X1'], df['X2'], c=df['y_mean'], cmap=cmap, s=df['Count']*25, edgecolors='black')
+#
+#     ax.set_title("{} labels: {} data points".format(mod, len(y[y != 0])))
+#     # ax.tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False)
+#     plt.show()
