@@ -20,7 +20,7 @@ sign = [-1, -1, -1, -1, -1]  # 1 if higher is better; -1 if lower is better
 
 
 class DashApp():
-    def __init__(self, modifier, size, w_model=None):
+    def __init__(self, modifier, w_model=None):
         self.app = Dash(__name__)
         if w_model:
             if w_model == 'expert':
@@ -32,9 +32,10 @@ class DashApp():
         else:
             weights_init = np.repeat([1], 5)
 
-        dataloader = data_loader.DataLoader(modifier, ref_std='testdata')
-        unweighted_df, test_nans, test_lnglat_part, col_names = dataloader.preprocess_input()
-        df_orig = dataloader.load_orig_df()
+        data = data_loader.DataLoader(modifier, ref_std='testdata')
+        unweighted_df, test_nans, test_lnglat_part, col_names = data.preprocess_input()
+        df_orig = data.load_orig_df()
+        size = data.size
 
         if df_orig.shape[-1] == 7:
             unweighted_df = unweighted_df[:, 2:]
