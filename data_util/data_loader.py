@@ -41,8 +41,7 @@ class DataLoader:
         df = pd.read_csv(data_url + '/metadata.csv', delimiter=';', index_col='modifier')
         row = df.loc[self.modifier]
         self.bbox = row['bbox']
-        if not np.isnan(row['size']):
-            print(row['size'])
+        if not pd.isna(row['size']):
             self.size = int(row['size'])
         else:
             self.size = 400
@@ -133,6 +132,8 @@ def load_meta(modifier):
     row = df.loc[modifier]
     bbox = row['bbox']
     bbox = [float(i[0:-1]) for i in bbox.split()]
+    print(row['size'])
+    print(type(row['size']))
     if not np.isnan(row['size']):
         size = int(row['size'])
     else:
