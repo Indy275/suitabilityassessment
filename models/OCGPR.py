@@ -166,84 +166,92 @@ class OCGP():
         return x, y
 
 
-def run_model(train_mod, test_mod, train_size, test_size):
-    train_loader = data_loader.DataLoader(train_mod, model='hist_buildings')
-    test_loader = data_loader.DataLoader(test_mod, model='testdata')
+def run_model(train_mod, test_mod):
+    train_data = data_loader.DataLoader(train_mod, ref_std='hist_buildings')
+    test_data = data_loader.DataLoader(test_mod, ref_std='testdata')
 
-    X_train, y_train, train_lnglat, train_col_names = train_loader.preprocess_input()
-    X_test, test_nans, test_lnglat, test_col_names = test_loader.preprocess_input()
+    X_train, y_train, train_lnglat, train_col_names = train_data.preprocess_input()
+    X_testdata, test_nans, test_lnglat, test_size, test_col_names = test_data.preprocess_input()
+    n_feats = X_train.shape[-1]
 
-    bg_test = test_loader.load_bg()
+    bg_test = test_data.load_bg()
     assert train_col_names == test_col_names
 
     if plot_data:
-        bg_train = train_loader.load_bg()
-        plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
+        bg_train = train_data.load_bg()
+        plot.plot_y(train_data, bg_train, ref_std='hist_buildings')
     kernel, v, N, svar, ls, p = set_hypers()
 
     y_preds = np.zeros((test_size, test_size, 4))
-
-    X_test = np.reshape(X_test, (test_size, test_size, -1))
-    half_size = test_size/2
+    X_test = np.zeros((test_size * test_size, n_feats))
+    X_test[~test_nans] = X_testdata
+    X_test = X_test.reshape((test_size, test_size, -1))
+    half_size = int(test_size / 2)
     partitions = [X_test[:half_size, :half_size],
                   X_test[:half_size, half_size:],
                   X_test[half_size:, :half_size],
                   X_test[half_size:, half_size:]]
+    test_nans = np.reshape(test_nans,(test_size, test_size))
+    nan_partition = [test_nans[:half_size, :half_size],
+                     test_nans[:half_size, half_size:],
+                     test_nans[half_size:, :half_size],
+                     test_nans[half_size:, half_size:]]
 
     for part in range(len(partitions)):
-        train_part_loader = data_loader.DataLoader(train_mod, model='hist_buildings')
-        test_part_loader = data_loader.DataLoader(test_mod, model='testdata')
-        X_train, y_train, train_lnglat, train_col_names = train_part_loader.preprocess_input()
-        X_test, test_nans, test_lnglat_part, test_col_names = test_part_loader.preprocess_input()
+        test_nans_part = nan_partition[part].reshape((half_size*half_size))
+        X_test_part = partitions[part].reshape((half_size * half_size, -1))
+        X_test_part = X_test_part[~test_nans_part]
+
+        y_preds_part = np.zeros((test_nans_part.shape[0], 4))
+        y_preds_part[test_nans_part, :] = np.nan
 
         ocgp = OCGP()
 
         if kernel == "se":
             title = f'SE kernel with ls={ls}, svar={svar}'
-            ocgp.seKernel(X_train, X_test, ls, svar)
+            ocgp.seKernel(X_train, X_test_part, ls, svar)
         elif kernel == "adaptive":
             ls = ocgp.adaptiveHyper(X_train, p)
             ls = np.log(ls)
             title = f'Adaptive hyper with svar={svar}, p={p}, and learned ls={ls}'
             # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
-            ocgp.adaptiveKernel(X_train, X_test, ls, svar)
+            ocgp.adaptiveKernel(X_train, X_test_part, ls, svar)
         elif kernel == "scaled":
             # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
-            meanDist_xn, meanDist_yn = ocgp.scaledHyper(X_train, X_test, N)
+            meanDist_xn, meanDist_yn = ocgp.scaledHyper(X_train, X_test_part, N)
             title = f'Scaled hyper with svar={svar}, v={v}, N={N}'
-            ocgp.scaledKernel(X_train, X_test, v, meanDist_xn, meanDist_yn, svar)
+            ocgp.scaledKernel(X_train, X_test_part, v, meanDist_xn, meanDist_yn, svar)
         else:
             print(f'Not implemented: {kernel=}')
             return
 
         modes = ['mean', 'var', 'pred', 'ratio']
-        y_preds_part = np.zeros((X_test.shape[0], 4))
-        for i in range(len(modes)):
-            print("Creating scores and plotting using",modes[i])
 
-            y_preds_part[test_nans, :] = np.nan
-            y_preds_part[:, i] = np.squeeze(np.array(ocgp.getGPRscore(modes[i])))
-        y_preds_part = y_preds_part.reshape((test_size, test_size, 4))
-        if part == 0: y_preds[:half_size, :half_size, :] = y_preds_part
-        elif part == 1: y_preds[:half_size, half_size:, :] = y_preds_part
-        elif part == 2: y_preds[half_size:, :half_size, :] = y_preds_part
-        elif part == 3: y_preds[half_size:, half_size:, :] = y_preds_part
+        for i in range(len(modes)):
+            y_preds_part[~test_nans_part, i] = np.squeeze(np.array(ocgp.getGPRscore(modes[i])))
+
+        if part == 0:
+            y_preds[:half_size, :half_size, :] = y_preds_part.reshape((half_size, half_size, 4))
+        elif part == 1:
+            y_preds[:half_size, half_size:, :] = y_preds_part.reshape((half_size, half_size, 4))
+        elif part == 2:
+            y_preds[half_size:, :half_size, :] = y_preds_part.reshape((half_size, half_size, 4))
+        elif part == 3:
+            y_preds[half_size:, half_size:, :] = y_preds_part.reshape((half_size, half_size, 4))
 
     if plot_pred:
         titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
                   r'log. moment ratio $\mu_*/\sigma_*$']
         fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
         name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
-
         for i in range(len(titles)):
             X1 = test_lnglat[:, 0]
             X2 = test_lnglat[:, 1]
             cmap = plot.set_colmap()
             cmap.set_bad('tab:blue')
             ax = plt.subplot(2, 2, i + 1)
-            ax.imshow(bg_test, extent=[np.min(X1),np.max(X1),np.min(X2),np.max(X2)], origin='upper')
-            plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, i].reshape((test_size, test_size)),
-                         cmap=cmap, origin='upper', alpha=0.65)
+            ax.imshow(bg_test, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper')
+            plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, :, i], cmap=cmap, origin='upper', alpha=0.65)
             ax.set_title(titles[i])
         plt.suptitle(title)
         plt.tight_layout()

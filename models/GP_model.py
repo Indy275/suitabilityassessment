@@ -29,10 +29,11 @@ def save_imp(imp, names, model, modifier):
 
 
 def set_hypers():
-    nu = float(config['MODEL_PARAMS_GP']['nu'])
+    nu_coords = float(config['MODEL_PARAMS_GP']['nu_coords'])
+    nu_feats = float(config['MODEL_PARAMS_GP']['nu_feats'])
     num_steps = int(config['MODEL_PARAMS_GP']['num_steps'])
     lr = float(config['MODEL_PARAMS_GP']['lr'])
-    return nu, num_steps, lr
+    return nu_coords, nu_feats, num_steps, lr
 
 
 class ExactGPModel(ExactGP):
@@ -41,11 +42,12 @@ class ExactGPModel(ExactGP):
         self.mean_module = ConstantMean()
         self.covar_module_coord = kernel1
         self.covar_module_feat = kernel2
+        self.added_loss_terms()
 
     def forward(self, x):
         mean_x = self.mean_module(x)
-        # covar_x = self.covar_module(x)
         full_covar_module = self.covar_module_coord + self.covar_module_feat
+
         covar_x = full_covar_module(x)
         return MultivariateNormal(mean_x, covar_x)
 
@@ -93,9 +95,13 @@ def train(train_x, train_y, kernel1, kernel2, num_steps=500, lr=0.01):
             ))
         optimizer.step()
 
-    print('Training completed - Loss: %.3f   noise: %.3f ' % (
+    print('Training completed - Loss: %.3f   noise: %.3f   scales: %.3f , %.3f   SNR: %.3f' % (
         losses[-1].item(),
-        model.likelihood.noise.item()
+        model.likelihood.noise.item(),
+        model.covar_module_coord.outputscale.item(),
+        model.covar_module_feat.outputscale.item(),
+        model.covar_module_feat.outputscale.item() / model.likelihood.noise.item()
+
     ))
     if not isinstance(kernel2, LinearKernel):
         with torch.no_grad():
@@ -135,7 +141,7 @@ def predict(LngLat, X_test, test_nans, model, likelihood, test_mod):
 
 
 def evaluate(test_mod, model, likelihood):
-    eval_loader = data_loader.DataLoader(test_mod, model='expert_ref')
+    eval_loader = data_loader.DataLoader(test_mod, ref_std='expert_ref')
     x_eval, y_eval, eval_lnglat, test_col_names = eval_loader.preprocess_input()
     test_nans = np.isnan(x_eval).any(axis=1)
 
@@ -145,39 +151,39 @@ def evaluate(test_mod, model, likelihood):
     print("Test MSE: {:.4f}".format(mse))
 
 
-def run_model(train_mod, test_mod, test_size):
-    train_loader = data_loader.DataLoader(train_mod, model='expert_ref')
-    test_loader = data_loader.DataLoader(test_mod, model='testdata')
+def run_model(train_mod, test_mod):
+    train_data = data_loader.DataLoader(train_mod, ref_std='expert_ref')
+    test_data = data_loader.DataLoader(test_mod, ref_std='testdata')
 
-    X_train, y_train, train_lnglat, train_col_names = train_loader.preprocess_input()
-    X_test, test_nans, test_lnglat, test_col_names = test_loader.preprocess_input()
+    X_train, y_train, train_lnglat, train_col_names = train_data.preprocess_input()
+    X_test, test_nans, test_lnglat, test_size, test_col_names = test_data.preprocess_input()
 
-    bg_test = test_loader.load_bg()
+    bg_test = test_data.load_bg()
     assert train_col_names == test_col_names
 
     if plot_data:
-        bg_train = train_loader.load_bg()
-        plot.plot_y_expert(train_mod, X_train, y_train, bg_train)
+        bg_train = train_data.load_bg()
+        plot.plot_y(train_data, bg_train, ref_std='expert_ref')
 
-    # ind = [3,4]
+    # ind = 6
     # ind = [0, 1]  # Longitude, Latitude
-    # X_train = X_train[:, ind]  # temp
-    # X_test = X_test[:, ind]  # temp
-    # col_names = [col_names[a] for a in ind] # temp
+    # X_train = X_train[:, ind].reshape(-1, 1)  # temp
+    # X_test = X_test[:, ind].reshape(-1, 1)  # temp
+    # train_col_names = train_col_names[ind]  # temp    X_train = torch.tensor(X_train).float()
 
     print(f'Training model. Train shape: {X_train.shape}. Test shape: {X_test.shape}')
     print(f'Train variables: {train_col_names}')
 
-    n_feats = X_train.shape[1]
     X_train = torch.tensor(X_train).float()
     y_train = torch.tensor(y_train).float()
     X_test = torch.tensor(X_test).float()
 
-    nu, num_steps, lr = set_hypers()
-    coord_kernel = ScaleKernel(MaternKernel(nu=0.5, ard_num_dims=2, active_dims=(0, 1)))
-    kernels = {'RBF': ScaleKernel(RBFKernel(ard_num_dims=5, active_dims=(2, 3, 4, 5, 6))),
-               'Linear': LinearKernel(active_dims=(2, 3, 4, 5, 6)),
-               'Matern': ScaleKernel(MaternKernel(nu=nu, ard_num_dims=5, active_dims=(2, 3, 4, 5, 6)))}
+    coord_nu,feat_nu, num_steps, lr = set_hypers()
+    coord_kernel = ScaleKernel(MaternKernel(nu=coord_nu, ard_num_dims=2, active_dims=(0, 1)))
+    kernels = {'RBF': ScaleKernel(RBFKernel(ard_num_dims=5, active_dims=(2, 3, 4, 5, 6))),}
+               # 'Linear': ScaleKernel(LinearKernel(active_dims=(2, 3, 4, 5, 6))),
+               # 'Matern': ScaleKernel(MaternKernel(nu=feat_nu, ard_num_dims=5, active_dims=(2, 3, 4, 5, 6)))}
+    # kernels = {'Matern': ScaleKernel(RBFKernel())}  # msk
     for k_name, feature_kernel in kernels.items():
         model, likelihood, losses, ls = train(X_train, y_train, coord_kernel, feature_kernel, num_steps=num_steps,
                                               lr=lr)
@@ -188,7 +194,7 @@ def run_model(train_mod, test_mod, test_size):
             fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
             fig_name = fig_url + test_mod + '_' + train_mod + '_GP' + k_name
 
-            if train_mod == test_mod:
+            if train_mod == test_mod:  # plot train labels on top of prediction
                 train_labs = np.column_stack([train_lnglat[:, 0], train_lnglat[:, 1], y_train])
                 plot.plot_prediction(y_preds, test_size, fig_name, train_labs=train_labs, contour=True, bg=bg_test,
                                      savefig=True)

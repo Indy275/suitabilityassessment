@@ -69,26 +69,26 @@ def eval_model(y_test, y_preds, test_vals):
     print("Test MSE: {:.4f}".format(mse))
 
 
-def run_model(train_mod, test_mod, model, train_size, test_size, ref_std):
-    train_loader = data_loader.DataLoader(train_mod, model)
-    test_loader = data_loader.DataLoader(test_mod, model='testdata')
+def run_model(train_mod, test_mod, model, ref_std):
+    train_data = data_loader.DataLoader(train_mod, ref_std=ref_std)
+    test_data = data_loader.DataLoader(test_mod, ref_std='testdata')
 
-    X_train, y_train, train_lnglat, train_col_names = train_loader.preprocess_input()
-    X_test, test_nans, test_lnglat, test_col_names = test_loader.preprocess_input()
+    X_train, y_train, train_lnglat, train_col_names = train_data.preprocess_input()
+    X_test, test_nans, test_lnglat, test_size, test_col_names = test_data.preprocess_input()
 
-    bg_test = test_loader.load_bg()
+    bg_test = test_data.load_bg()
     assert train_col_names == test_col_names
 
     if plot_data:
-        bg_train = train_loader.load_bg()
-        plot.plot_y(y_train, bg_train, bg_test, train_size, test_size)
+        bg_train = train_data.load_bg()
+        plot.plot_y(train_data, bg_train, ref_std=ref_std)
 
+    # ind = 3
+    # # ind = [0, 1]  # Longitude, Latitude
+    # X_train = X_train[:, ind].reshape(-1, 1)  # temp
+    # X_test = X_test[:, ind].reshape(-1, 1)  # temp
+    # train_col_names = train_col_names[ind]  # temp
 
-    # ind = [5]
-    # ind = [0, 1]  # Longitude, Latitude
-    # X_train = X_train[:, ind]  # temp
-    # X_test = X_test[:, ind]  # temp
-    # col_names = col_names[ind]  # temp
     print(f'Training model. Train shape: {X_train.shape}. Test shape: {X_test.shape}')
     print(f'Train variables: {train_col_names}')
 

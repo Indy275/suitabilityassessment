@@ -19,6 +19,7 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 data_url = config['DEFAULT']['data_url']
+fav_url = config['DEFAULT']['data_layers']
 json_headers = json.loads(config['DEFAULT']['json_headers'])
 recreate_labs = config.getboolean('DATA_SETTINGS', 'recreate_labs')
 recreate_feats = config.getboolean('DATA_SETTINGS', 'recreate_feats')
@@ -124,12 +125,13 @@ def get_labels(model, modifier, copy):
             shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['Value'])]
 
         elif model == 'hist_buildings':
-            if modifier.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:
-                hist_bld_source = 'waterland1900min'
-            elif modifier.lower() in ['noordholland', 'noordhollandhires']:
-                hist_bld_source = 'HHNKpre1900filtered'
-            else:
-                print(f'There was an incompatibility issue: {model=} {modifier=}')
+            hist_bld_source = 'HHNKpre1900filtered'
+            # if modifier.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:
+            #     hist_bld_source = 'waterland1900min'
+            # elif modifier.lower() in ['noordholland', 'noordhollandhires']:
+            #     hist_bld_source = 'HHNKpre1900filtered'
+            # else:
+            #     print(f'There was an incompatibility issue: {model=} {modifier=}')
             gdf = gpd.read_file(data_url + f'/{hist_bld_source}.shp')
             gdf.to_crs(crs='EPSG:4326', inplace=True)
             gdf['value'] = 1
@@ -163,7 +165,6 @@ def get_fav_data(modifier, model, bbox, size, test):
     :param test: boolean indicating test data, to exclude labels
     :return:
     """
-    fav_url = "https://hhnk.lizard.net/api/v4/favourites/97ffd069-1da0-43f3-964e-cdded4a8565b/"
     r = requests.get(url=fav_url, headers=json_headers)
     data = r.json()['state']
     lng = np.linspace(min([bbox[0], bbox[2]]), max([bbox[0], bbox[2]]), size)
@@ -226,6 +227,7 @@ def create_df(modifier, bbox, size, model, test=False):
     df = pd.DataFrame(data, columns=col_names)
     thresholds = [7, 4, 80, .5, 2]  # 7m primary; 4m regional; 80mm subsidence; .5m waterdepth; 2m soil capacity
     for i, column in enumerate(df.columns[2:-1]):
+        print(column, df[column].max())
         df.loc[df[column] > thresholds[i], column] = thresholds[i]
 
     # Normalize the features (without normalizing location and labels)

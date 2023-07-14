@@ -1,10 +1,10 @@
 from models import baseline_model, GP_model, OCGPR
 
 
-def run_model(train_mod, test_mod, model, train_size, test_size, ref_std):
+def run_model(train_mod, test_mod, model, ref_std):
     if model == 'ocgp':
-        OCGPR.run_model(train_mod, test_mod, train_size, test_size)
+        OCGPR.run_model(train_mod, test_mod)
     elif model == 'gp':
-        GP_model.run_model(train_mod, test_mod, test_size)
+        GP_model.run_model(train_mod, test_mod)
     else:
-        baseline_model.run_model(train_mod, test_mod, model, train_size, test_size, ref_std)
+        baseline_model.run_model(train_mod, test_mod, model, ref_std)

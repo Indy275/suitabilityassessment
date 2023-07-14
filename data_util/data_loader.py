@@ -41,7 +41,11 @@ class DataLoader:
         df = pd.read_csv(data_url + '/metadata.csv', delimiter=';', index_col='modifier')
         row = df.loc[self.modifier]
         self.bbox = row['bbox']
-        self.size = row['size']
+        if not np.isnan(row['size']):
+            print(row['size'])
+            self.size = int(row['size'])
+        else:
+            self.size = 400
 
     def load_data(self):
         df = pd.read_csv(data_url + '/' + self.modifier + '/' + self.ref_std + '.csv')
@@ -65,7 +69,7 @@ class DataLoader:
             col_names = self.col_names[2:]
         nans = np.isnan(self.X).any(axis=1)
         X = X[~nans]
-        return X, nans, self.lnglat, col_names
+        return X, nans, self.lnglat, self.size, col_names
 
     def _preprocess_train(self):
         if coords_as_features:
@@ -122,3 +126,15 @@ def preprocess_input(train_loader, test_loader, lnglat=True):
     X_test_feats = X_test[:, lnglat:]
     col_names = col_names[lnglat:]
     return X_train, y_train, X_test_feats, trainLngLat, testLngLat, test_nans, col_names
+
+
+def load_meta(modifier):
+    df = pd.read_csv(data_url + '/metadata.csv', delimiter=';', index_col='modifier')
+    row = df.loc[modifier]
+    bbox = row['bbox']
+    bbox = [float(i[0:-1]) for i in bbox.split()]
+    if not np.isnan(row['size']):
+        size = int(row['size'])
+    else:
+        size = 400
+    return bbox, size

@@ -30,27 +30,24 @@ else:
     assert ml_model in ['gbr', 'gp', 'svm', 'ocgp', 'expert'], f'ML model {ml_model} is invalid;' \
                                                      f' should be one of [gbr, gp, svm, ocgp, expert]'
 
-load_train = data_loader.DataLoader(train_mod, ref_std)
-load_test = data_loader.DataLoader(test_mod, ref_std='test_data')
-train_bbox = [float(i[0:-1]) for i in load_train.bbox.split()]
-test_bbox = [float(i[0:-1]) for i in load_test.bbox.split()]
-train_size = load_train.size
-test_size = load_test.size
+
 
 if process_expertdata:
     process_expert_data.run_model(cluster, expert_processing=expert)
 
 if create_new_data:
     print("     Creating data frame for {}".format(train_mod))
+    train_bbox, train_size = data_loader.load_meta(train_mod)
     create_data.create_df(train_mod, train_bbox, train_size, ref_std)
     print("     Creating data frame for {}".format(test_mod))
+    test_bbox, test_size = data_loader.load_meta(test_mod)
     create_data.create_df(test_mod, test_bbox, test_size, ref_std, test=True)
 
 if run_models:
     print("     Running {}-model with {} for {} and {}".format(ml_model, ref_std, train_mod, test_mod))
-    run.run_model(train_mod, test_mod, ml_model, train_size, test_size, ref_std)
+    run.run_model(train_mod, test_mod, ml_model, ref_std)
 
 if run_interactive_plot:
     print("     Creating interactive plot")
-    plot = DashApp(modifier=test_mod, size=test_size, w_model=ml_model)
+    plot = DashApp(modifier=test_mod, w_model=ml_model)
     plot.run()
