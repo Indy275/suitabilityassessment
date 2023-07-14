@@ -1,5 +1,4 @@
 import datetime
-
 import configparser
 import os
 import numpy as np
@@ -22,9 +21,6 @@ def set_cluster(cluster):
         data_link = 'Bodem en Watersturend OC_May 31, 2023_15.14'
         start_date = datetime.date(2023, 5, 15)
         locationIDs = list('ABCDE')
-    data_link = 'Bodem en Watersturend WS v2_June 9, 2023_09.44'
-    start_date = datetime.date(2023, 5, 23)
-    locationIDs = list('ABCDEFGHIJKLMNOPQRSTUVWXYZab')
     return data_link, start_date, locationIDs
 
 
@@ -88,7 +84,6 @@ def run_model(cluster, expert_processing):
         weights = pd.DataFrame({'Point': datapoints, 'Value': weights})
 
     weights = weights.merge(point_data, on='Point', how='left')
-    # weights = weights[['Point', 'Lng', 'Lat', 'Value', 'Std']]
     weights.sort_values(by='Point', inplace=True)
 
     weights.to_csv(data_url + "/expertscores_{}.csv".format(cluster), index=False)
