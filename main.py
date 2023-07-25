@@ -30,8 +30,6 @@ else:
     assert ml_model in ['gbr', 'gp', 'svm', 'ocgp', 'expert'], f'ML model {ml_model} is invalid;' \
                                                      f' should be one of [gbr, gp, svm, ocgp, expert]'
 
-
-
 if process_expertdata:
     process_expert_data.run_model(cluster, expert_processing=expert)
 
