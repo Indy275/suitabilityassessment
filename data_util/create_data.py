@@ -16,11 +16,15 @@ from pyproj import Transformer
 from sklearn.preprocessing import StandardScaler
 
 config = configparser.ConfigParser()
-config.read('config.ini')
+parent = os.path.dirname
+config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 
 data_url = config['DEFAULT']['data_url']
 fav_url = config['DEFAULT']['data_layers']
-json_headers = json.loads(config['DEFAULT']['json_headers'])
+pwd = config['DEFAULT']['lizard_pwd']
+json_headers = {"username": "__key__",
+                "password": pwd,
+                "Content-Type": "application/json"}
 recreate_labs = config.getboolean('DATA_SETTINGS', 'recreate_labs')
 recreate_feats = config.getboolean('DATA_SETTINGS', 'recreate_feats')
 
@@ -39,24 +43,25 @@ def create_bg(mod, bbox):
     bbox = [float(i[0:-1]) for i in bbox.split()]
     NH_w = 5.37725914616264 - 4.52690620343425  # MaxLng - minLng
     NH_h = 53.21427409446518 - 52.36877567446727  # maxLat - minLat
-    poly_bbox = (concoo([bbox[0], bbox[3]]), concoo([bbox[2], bbox[3]]),concoo([bbox[2], bbox[1]]),concoo([bbox[0], bbox[1]]))
+    poly_bbox = (
+    concoo([bbox[0], bbox[3]]), concoo([bbox[2], bbox[3]]), concoo([bbox[2], bbox[1]]), concoo([bbox[0], bbox[1]]))
     poly = Polygon(poly_bbox)
-    with rasterio.open(data_url+'/background.tif') as src:  # Read raster data from disk
+    with rasterio.open(data_url + '/background.tif') as src:  # Read raster data from disk
         arr = src.read(1)
         orig_h = arr.shape[0]
         orig_w = arr.shape[1]
         raster_meta = src.meta
         clipped_dataset, out_transform = rasterio.mask.mask(src, [poly], crop=True)
 
-    h = int(round(orig_h * abs(bbox[1]-bbox[3]) / NH_h))
-    w = int(round(orig_w * abs(bbox[0]-bbox[2]) / NH_w))
+    h = int(round(orig_h * abs(bbox[1] - bbox[3]) / NH_h))
+    w = int(round(orig_w * abs(bbox[0] - bbox[2]) / NH_w))
     raster_meta.update({
         'height': h,
         'width': w,
         'crs': src.crs,
     })
 
-    with rasterio.open(data_url+f'/{mod}/bg.tif', 'w', **raster_meta) as dst:  # Write data masked with watergangen
+    with rasterio.open(data_url + f'/{mod}/bg.tif', 'w', **raster_meta) as dst:  # Write data masked with watergangen
         dst.write(clipped_dataset)
 
 
@@ -105,40 +110,34 @@ def get_raster_data(raster_url, modifier, name, bbox, size):
     return np.squeeze(data)
 
 
-def get_labels(model, modifier, copy):
+def get_labels(ref_std, modifier, copy):
     """
     Get target labels, either from expert judgement or historic buildings.
     Open .tiff-file with labels if existing, otherwise create the file first.
 
-    :param model: str, 'expert_ref' or 'hist_buildings'
+    :param ref_std: str, 'expert_ref' or 'hist_buildings'
     :param modifier:
     :param copy: layer data for feature burning
     :return: labels
     """
-    geotiff_name = data_url + '/rasters/' + modifier + '/' + model + '.tiff'
+    geotiff_name = data_url + '/rasters/' + modifier + '/' + ref_std + '.tiff'
     if (not Path(geotiff_name).is_file()) or recreate_labs:  # if it doesn't yet exist, or if we want to recreate anyway
-        print(f'(Re)creating layer; retrieving {model} labels')
+        print(f'(Re)creating layer; retrieving {ref_std} labels')
 
-        if model == 'expert_ref':
+        if ref_std == 'expert_ref':
             df = pd.read_csv(data_url + '/expertscores_{}.csv'.format(modifier), header=[0])
             gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.Lng, df.Lat))
             shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['Value'])]
 
-        elif model == 'hist_buildings':
+        elif ref_std == 'hist_buildings':
             hist_bld_source = 'HHNKpre1900filtered'
-            # if modifier.lower() in ['purmer', 'schermerbeemster', 'purmerend', 'volendam']:
-            #     hist_bld_source = 'waterland1900min'
-            # elif modifier.lower() in ['noordholland', 'noordhollandhires']:
-            #     hist_bld_source = 'HHNKpre1900filtered'
-            # else:
-            #     print(f'There was an incompatibility issue: {model=} {modifier=}')
             gdf = gpd.read_file(data_url + f'/{hist_bld_source}.shp')
             gdf.to_crs(crs='EPSG:4326', inplace=True)
             gdf['value'] = 1
             shapes = ((geom, value) for geom, value in zip(gdf['geometry'], gdf['value']))
         else:
-            print(f'There was an incompatibility issue: {model=} {modifier=}')
-
+            print(f'There was an incompatibility issue: {ref_std=} {modifier=}')
+            return
         copy_fn = data_url + '/rasters/' + modifier + '/' + copy + '.tiff'
         copy_f = rasterio.open(copy_fn)
         meta = copy_f.meta.copy()
@@ -155,11 +154,11 @@ def get_labels(model, modifier, copy):
     return np.array(np.squeeze(data))
 
 
-def get_fav_data(modifier, model, bbox, size, test):
+def get_fav_data(modifier, ref_std, bbox, size, test):
     """ Retrieve the data layers present in the favourite instance
 
     :param modifier: string indication of data source
-    :param model: model labels
+    :param ref_std: model labels
     :param bbox: bounding box
     :param size: size of data to be produced
     :param test: boolean indicating test data, to exclude labels
@@ -179,12 +178,12 @@ def get_fav_data(modifier, model, bbox, size, test):
         combined_sources.append(layerdata)
 
     if not test:
-        label_data = get_labels(model, modifier, copy=col_names[-2])
+        label_data = get_labels(ref_std, modifier, copy=col_names[-2])
     else:  # test data -> no labels
         label_data = np.zeros((size, size))
 
     combined_sources.append(label_data)
-    col_names.append(model.strip())
+    col_names.append(ref_std.strip())
 
     data = np.array(combined_sources)
 
@@ -212,22 +211,21 @@ def get_expert_data(modifier):
     return data, col_names
 
 
-def create_df(modifier, bbox, size, model, test=False):
+def create_df(modifier, bbox, size, ref_std, test=False):
     if not os.path.exists(data_url + '/' + modifier):
         os.makedirs(data_url + '/' + modifier)
         os.makedirs(data_url + '/rasters/' + modifier)
 
-    if model == 'expert_ref' and not test:
+    if ref_std == 'expert_ref' and not test:
         data, col_names = get_expert_data(modifier)
 
     else:
-        data, col_names = get_fav_data(modifier, model, bbox, size, test=test)
+        data, col_names = get_fav_data(modifier, ref_std, bbox, size, test=test)
 
     # Change outlier values: cut-off at threshold
     df = pd.DataFrame(data, columns=col_names)
-    thresholds = [7, 4, 80, .5, 2]  # 7m primary; 4m regional; 80mm subsidence; .5m waterdepth; 2m soil capacity
+    thresholds = [6, 6, 1000, 1.5, 1000]  # 6m primary; 6m regional; 100mm subsid; 1.5m waterdepth; 2.5m soil capacity
     for i, column in enumerate(df.columns[2:-1]):
-        print(column, df[column].max())
         df.loc[df[column] > thresholds[i], column] = thresholds[i]
 
     # Normalize the features (without normalizing location and labels)
@@ -239,8 +237,7 @@ def create_df(modifier, bbox, size, model, test=False):
 
     df = pd.DataFrame(data_conc, columns=col_names)
 
-    ref_std = 'testdata' if test else model
-    df.to_csv(data_url + '/' + modifier + "/" + ref_std + ".csv", index=False)
-    dump(ss, data_url + '/' + modifier + "/" + ref_std + "_scaler.joblib")
-    print("Data with shape {} saved to {}/{}.csv".format(data_conc.shape, modifier, ref_std))
-
+    model = 'testdata' if test else ref_std
+    df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
+    dump(ss, data_url + '/' + modifier + "/" + model + "_scaler.joblib")
+    print("Data with shape {} saved to {}/{}.csv".format(data_conc.shape, modifier, model))

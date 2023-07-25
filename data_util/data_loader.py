@@ -119,8 +119,6 @@ def load_meta(modifier):
     row = df.loc[modifier]
     bbox = row['bbox']
     bbox = [float(i[0:-1]) for i in bbox.split()]
-    print(row['size'])
-    print(type(row['size']))
     if not np.isnan(row['size']):
         size = int(row['size'])
     else:
