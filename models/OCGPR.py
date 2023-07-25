@@ -6,6 +6,8 @@ from plotting import plot
 
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial import distance
+from sklearn.metrics import mean_squared_error
+
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import cdist
@@ -166,6 +168,23 @@ class OCGP():
         return x, y
 
 
+def evaluate(X_train, test_mod, ls, svar):
+    eval_loader = data_loader.DataLoader(test_mod, ref_std='expert_ref')
+    x_eval, y_eval, lnglat, col_names = eval_loader.preprocess_input()
+
+    ocgp = OCGP()
+    ocgp.seKernel(X_train, x_eval, ls, svar)
+    mselist = []
+    modes = ['mean', 'var', 'pred', 'ratio']
+
+    for i in range(len(modes)):
+        y_pred = np.squeeze(np.array(ocgp.getGPRscore(modes[i])))
+        mse = mean_squared_error(y_eval, y_pred)
+        print("{} test MSE: {:.4f}".format(modes[i], mse))
+        mselist.append(mse)
+    return mselist
+
+
 def run_model(train_mod, test_mod):
     train_data = data_loader.DataLoader(train_mod, ref_std='hist_buildings')
     test_data = data_loader.DataLoader(test_mod, ref_std='testdata')
@@ -198,9 +217,11 @@ def run_model(train_mod, test_mod):
                      test_nans[half_size:, half_size:]]
 
     for part in range(len(partitions)):
+        print("Calculating for partition", part)
         test_nans_part = nan_partition[part].reshape((half_size*half_size))
         X_test_part = partitions[part].reshape((half_size * half_size, -1))
         X_test_part = X_test_part[~test_nans_part]
+        print(X_train.shape, X_test_part.shape)
 
         y_preds_part = np.zeros((test_nans_part.shape[0], 4))
         y_preds_part[test_nans_part, :] = np.nan
@@ -239,6 +260,11 @@ def run_model(train_mod, test_mod):
         elif part == 3:
             y_preds[half_size:, half_size:, :] = y_preds_part.reshape((half_size, half_size, 4))
 
+    mse_text = ['', '', '','']
+    if test_mod in ['oc', 'ws']:  # performance quantification only possible if expert labels are available
+        mse = evaluate(X_train, test_mod, ls, svar)
+        mse_text = [f'\n MSE {mode:.3f}' for mode in mse]
+
     if plot_pred:
         titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
                   r'log. moment ratio $\mu_*/\sigma_*$']
@@ -252,7 +278,7 @@ def run_model(train_mod, test_mod):
             ax = plt.subplot(2, 2, i + 1)
             ax.imshow(bg_test, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper')
             plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, :, i], cmap=cmap, origin='upper', alpha=0.65)
-            ax.set_title(titles[i])
+            ax.set_title(titles[i]+mse_text[i])
         plt.suptitle(title)
         plt.tight_layout()
         plt.savefig(name, bbox_inches='tight')

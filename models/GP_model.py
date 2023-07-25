@@ -8,7 +8,7 @@ from plotting import plot
 
 import torch
 from gpytorch.models import ExactGP
-from gpytorch.kernels import RBFKernel, MaternKernel, ScaleKernel, LinearKernel
+from gpytorch.kernels import RBFKernel, MaternKernel, ScaleKernel, LinearKernel, AdditiveKernel
 from gpytorch.means import ConstantMean
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.likelihoods import GaussianLikelihood
@@ -37,19 +37,24 @@ def set_hypers():
 
 
 class ExactGPModel(ExactGP):
-    def __init__(self, X_train, y_train, kernel1, kernel2, likelihood):
+    def __init__(self, X_train, y_train, kernel1, kernel2, likelihood, lasso_weight=1e-4):
         super(ExactGPModel, self).__init__(X_train, y_train, likelihood)
         self.mean_module = ConstantMean()
         self.covar_module_coord = kernel1
         self.covar_module_feat = kernel2
-        self.added_loss_terms()
+        self.covar_module = AdditiveKernel(self.covar_module_coord, self.covar_module_feat)
+        # self.covar_module = ScaleKernel(AdditiveKernel(self.covar_module_feat, num_dims=X_train.shape[-1]))
+        self.lasso_weight = lasso_weight
 
     def forward(self, x):
         mean_x = self.mean_module(x)
-        full_covar_module = self.covar_module_coord + self.covar_module_feat
-
-        covar_x = full_covar_module(x)
+        covar_x = self.covar_module(x)
         return MultivariateNormal(mean_x, covar_x)
+
+    def get_regularization_penalty(self):
+        return self.lasso_weight * \
+            (torch.norm(self.covar_module_coord.base_kernel.lengthscale, 1) +
+             torch.norm(self.covar_module_feat.base_kernel.lengthscale, 1))
 
 
 def preprocess_input(X_train, y_train, X_test, col_names):
@@ -85,7 +90,7 @@ def train(train_x, train_y, kernel1, kernel2, num_steps=500, lr=0.01):
     for i in range(num_steps):
         optimizer.zero_grad()
         output = model(train_x)
-        loss = -mll(output, train_y)
+        loss = -mll(output, train_y) + model.get_regularization_penalty()
         loss.backward()
         losses.append(loss)
         if i % 50 == 0:
@@ -188,8 +193,9 @@ def run_model(train_mod, test_mod):
         model, likelihood, losses, ls = train(X_train, y_train, coord_kernel, feature_kernel, num_steps=num_steps,
                                               lr=lr)
         y_preds = predict(test_lnglat, X_test, test_nans, model, likelihood, test_mod)
+        y_preds[~test_nans, 2] = np.digitize(y_preds[~test_nans, 2], np.nanquantile(y_preds[~test_nans, 2], [0, 0.2, 0.4, 0.6, 0.8, 1.0]))
         # y_preds[:, 2] = y_preds[:, 3] * -1  # Swap to plot variance; negated because high variance is worse
-
+        print(y_preds)
         if plot_pred:
             fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
             fig_name = fig_url + test_mod + '_' + train_mod + '_GP' + k_name
