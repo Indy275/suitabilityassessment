@@ -10,7 +10,7 @@ from collections import Counter
 
 
 def set_colmap():
-    colmap = LinearSegmentedColormap.from_list('colmap2', [[1, 0, 0, 1], [145 / 255, 210 / 255, 80 / 255, 1]]) # label
+    colmap = LinearSegmentedColormap.from_list('colmap2', [[1, 0, 0, 1], [145 / 255, 210 / 255, 80 / 255, 1]])  # label
     # colmap = LinearSegmentedColormap.from_list('colmap2', [[145 / 255, 210 / 255, 80 / 255, 1], [1, 0, 0, 1]])  # msk
     try:
         plt.register_cmap(cmap=colmap)
@@ -20,9 +20,22 @@ def set_colmap():
     return colmap
 
 
+def translate_names(words):
+    to_replace = ['Lng', 'Lat', 'Overstromingsbeeld primaire keringen', 'Overstromingsbeeld regionale keringen',
+                  'Bodemdaling Huidig', 'inundatiediepte T100',
+                  'Bodemberging bij grondwaterstand gelijk aan streefpeil']
+    replace_with = ['Longitude', 'Latitude', 'Flooding risk of primary embankments',
+                    'Flooding risk of regional embankments', 'Ground subsidence',
+                    'Bottlenecks excessive rainwater', 'Soil water storage capacity']
+    for rep, width in zip(to_replace, replace_with):
+        words = [w.replace(rep, width) for w in words]
+    return words
+
+
 def plot_f_importances(coef, names):
     imp = coef
     imp = np.abs(imp)
+    names = translate_names(names)
     imp, names = zip(*sorted(zip(imp, names)))
     names = ['\n'.join(wrap(x, 20)) for x in names]
     plt.barh(range(len(names)), imp, align='center')
@@ -47,11 +60,11 @@ def plot_prediction(y_preds, test_size, fig_name, train_labs=None, contour=True,
     ratio = height / width
     plt.imshow(bg, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper', aspect=ratio)
     if not contour:
-        plt.imshow(y_preds[:, 2].reshape((test_size, test_size)), alpha=0.65, cmap=cmap,
+        plt.imshow(y_preds[:, 2].reshape((test_size, test_size)), alpha=0.55, cmap=cmap,
                    extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)], aspect=ratio)
     else:
         plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
-                     cmap=cmap, origin='upper', alpha=0.65)
+                     cmap=cmap, origin='upper', alpha=0.55)
         # plt.contour(~np.ma.masked_invalid(y_preds[:, 2].reshape((test_size, test_size))))
         fig_name += '_contour'
 
