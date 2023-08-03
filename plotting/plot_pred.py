@@ -44,10 +44,12 @@ def plot_f_importances(coef, names):
     plt.show()
 
 
-def plot_prediction(y_preds, test_size, fig_name, train_labs=None, contour=True, bg=None, savefig=True):
+def plot_prediction(y_preds, test_size, fig_name=None, title='', train_labs=None, contour=True, bg=None, savefig=True):
     X1 = y_preds[:, 0]
     X2 = y_preds[:, 1]
     y_preds[:, 2] = np.ma.masked_invalid(y_preds[:, 2])
+    print("x1 are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 0]), np.nanmax(y_preds[:, 0])))
+    print("x2 are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 1]), np.nanmax(y_preds[:, 1])))
 
     print("predictions are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 2]), np.nanmax(y_preds[:, 2])))
 
@@ -58,49 +60,36 @@ def plot_prediction(y_preds, test_size, fig_name, train_labs=None, contour=True,
     except:
         width, height = bg.shape[0], bg.shape[1]
     ratio = height / width
-    plt.imshow(bg, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper', aspect=ratio)
+    # plt.imshow(bg, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper', aspect=ratio)
+    plt.imshow(bg, origin='upper', aspect=ratio,
+               extent=[np.nanmin(X1) - 0.0005, np.nanmax(X1) - 0.0005, np.nanmin(X2) + 0.0017, np.nanmax(X2) + 0.0017])
     if not contour:
         plt.imshow(y_preds[:, 2].reshape((test_size, test_size)), alpha=0.55, cmap=cmap,
                    extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)], aspect=ratio)
     else:
         plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
                      cmap=cmap, origin='upper', alpha=0.55)
-        # plt.contour(~np.ma.masked_invalid(y_preds[:, 2].reshape((test_size, test_size))))
-        fig_name += '_contour'
+        if savefig:
+            fig_name += '_contour'
 
     if train_labs is not None:
         points = [Point(x1, x2) for x1, x2 in train_labs[:, :2]]
         point_counts = Counter(points)
-        df = pd.DataFrame([
-            {'X1': p.x, 'X2': p.y, 'y': train_labs[i, 2], 'Count': point_counts[Point(p.x, p.y)]}
-            for i, p in enumerate(points)])
+        y = train_labs[:, 2]
+        df = pd.DataFrame(
+            [{'X1': p.x, 'X2': p.y, 'y': y[i], 'Count': point_counts[Point(p.x, p.y)]} for i, p in enumerate(points)])
+        df_mean = df.groupby(['X1', 'X2'])['y'].mean().to_frame(name='y_mean').reset_index()
+        df = df.merge(df_mean, on=['X1', 'X2'], how='left')
+        df.sort_values(['y_mean'], inplace=True)
 
         plt.scatter(df['X1'], df['X2'], c=df['y'], cmap=cmap, s=df['Count'] * 25, edgecolors='black')
 
     plt.xlabel('Longitude')
     plt.ylabel('Latitude')
+    plt.title(title)
     if savefig:
         plt.savefig(fig_name, bbox_inches='tight')
     plt.show()
-
-
-# def plot_contour(y_preds, test_size, fig_name, bg=None):
-#     X1 = y_preds[:, 1]
-#     X2 = y_preds[:, 0]
-#
-#     plt.subplots()
-#     cmap = set_colmap()
-#
-#     plt.imshow(bg, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper')
-#     plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
-#                  cmap=cmap, origin='upper', alpha=0.65)  # Plot the mean function as a filled contour
-#     # plt.contour(X1[:test_size], X2[::test_size], y_preds[:, 3].reshape((test_size, test_size)),
-#     #             levels=[1.96, 2.58], colors='black', linewidths=0.5, origin='upper', alpha=0.7)
-#     plt.xlabel('Longitude')
-#     plt.ylabel('Latitude')
-#
-#     plt.savefig(fig_name, bbox_inches='tight')
-#     plt.show()
 
 
 def plot_colorbar():
