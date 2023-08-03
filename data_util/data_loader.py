@@ -35,6 +35,11 @@ class DataLoader:
         self.lnglat = df_orig[:, :2]
         return df_orig
 
+    def denormalize(self, data):
+        ss = load(data_url + '/' + self.modifier + "/" + self.ref_std + "_scaler.joblib")
+        data = ss.inverse_transform(data)
+        return data
+
     def load_meta(self):
         df = pd.read_csv(data_url + '/metadata.csv', delimiter=';', index_col='modifier')
         row = df.loc[self.modifier]
@@ -65,7 +70,7 @@ class DataLoader:
             X = self.X[:, 2:]
             col_names = self.col_names[2:]
         nans = np.isnan(self.X).any(axis=1)
-        X = X[~nans]
+        # X = X[~nans]
         return X, nans, self.lnglat, self.size, col_names
 
     def _preprocess_train(self):
@@ -116,7 +121,11 @@ class DataLoader:
 
 def load_meta(modifier):
     df = pd.read_csv(data_url + '/metadata.csv', delimiter=';', index_col='modifier')
-    row = df.loc[modifier]
+    try:
+        row = df.loc[modifier]
+    except Exception:
+        print(f"Error: No metadata found for '{modifier}' ")
+
     bbox = row['bbox']
     bbox = [float(i[0:-1]) for i in bbox.split()]
     if not np.isnan(row['size']):
