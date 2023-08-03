@@ -24,7 +24,7 @@ class DashApp():
         self.app = Dash(__name__)
         if w_model:
             if w_model == 'expert':
-                weights_init = pd.read_csv(data_url + "/factorweights_WS.csv")
+                weights_init = pd.read_csv(data_url + "/factorweights_OC.csv")
                 weights_init = weights_init['Median']
             else:
                 weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
@@ -33,22 +33,28 @@ class DashApp():
             weights_init = np.repeat([1], 5)
 
         data = data_loader.DataLoader(modifier, ref_std='testdata')
-        unweighted_df, test_nans, test_lnglat_part, col_names = data.preprocess_input()
+        unweighted_df, nans, _, size, col_names = data.preprocess_input()
         df_orig = data.load_orig_df()
-        size = data.size
 
-        if df_orig.shape[-1] == 7:
+        bg = data.load_bg()
+        try:
+            width, height = bg.size
+        except:
+            width, height = bg.shape[0], bg.shape[1]
+        ratio = height / width
+
+        if unweighted_df.shape[-1] == 7:
             unweighted_df = unweighted_df[:, 2:]
-            col_names = col_names[2:-1]
-        unweighted_df[np.isnan(unweighted_df)] = 0
-        df_orig[np.isnan(df_orig)] = 0
+            col_names = col_names[2:]
+
+        unweighted_df[nans] = 0
+        df_orig[nans] = 0
 
         feature0 = df_orig[:, 0].reshape((size, size))
         feature1 = df_orig[:, 1].reshape((size, size))
         feature2 = df_orig[:, 2].reshape((size, size))
         feature3 = df_orig[:, 3].reshape((size, size))
         feature4 = df_orig[:, 4].reshape((size, size))
-
         self.app.layout = html.Div([
             dcc.Graph(id='graph-with-slider'),
             dcc.Markdown(col_names[0]),
@@ -81,7 +87,7 @@ class DashApp():
                        tooltip=dict(always_visible=True, placement='bottom'),
                        id='slider5'
                        )
-        ])
+        ], style={'textAlign': 'center'})
 
         @self.app.callback(
             Output('graph-with-slider', 'figure'),
@@ -105,11 +111,11 @@ class DashApp():
             weighted_df *= (5*-1 / weighted_df.min())
 
             weighted_df = weighted_df.reshape((size, size))
-            nullval = weighted_df[0][0]  # assumption that the point top-left is always the null value
+            nullval = weighted_df[0][0]  # assume that the point top-left always has the null value
             weighted_df[weighted_df == nullval] = weighted_df.min()-0.001
             colmap = [[0.0, 'rgb(31,119,180)'], [0.00001, 'rgb(255,0,0)'], [1.0, 'rgb(145,210, 80)']]
-
-            fig = px.imshow(weighted_df, labels=dict(color='suitability_score'), color_continuous_scale=colmap)
+            fig = px.imshow(weighted_df, labels=dict(color='suitability_score'),
+                            color_continuous_scale=colmap, aspect="auto", width=500, height=500*ratio)
 
             fig.update_layout(
                 plot_bgcolor='blue',
