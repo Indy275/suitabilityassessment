@@ -20,15 +20,22 @@ data_url = config['DEFAULT']['data_url']
 cluster = config['EXPERT_SETTINGS']['cluster']
 expert = config['EXPERT_SETTINGS']['expert']
 
-if ml_model in ['gbr', 'gp']:
+if ml_model in ['gbr', 'gp', 'gp1']:
     ref_std = 'expert_ref'
 elif ml_model in ['svm', 'ocgp']:
     ref_std = 'hist_buildings'
 elif ml_model == 'expert':
-    assert run_interactive_plot and not run_models, 'When model=expert, only interactive plot can be run'
+    ref_std = 'expert_ref'
 else:
-    assert ml_model in ['gbr', 'gp', 'svm', 'ocgp', 'expert'], f'ML model {ml_model} is invalid;' \
+    assert ml_model in ['gbr', 'gp', 'gp1','svm', 'ocgp', 'expert'], f'ML model {ml_model} is invalid;' \
                                                      f' should be one of [gbr, gp, svm, ocgp, expert]'
+
+if train_mod.lower().startswith(('oc', 'ws')):
+    if expert.startswith('i'):
+        train_mod = train_mod[:2] + 'all'
+elif test_mod.lower().startswith(('oc', 'ws')):
+    if expert.startswith('i'):
+        test_mod = test_mod[:2] + 'all'
 
 if process_expertdata:
     process_expert_data.run_model(cluster, expert_processing=expert)
