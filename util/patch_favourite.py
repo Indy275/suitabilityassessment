@@ -11,7 +11,10 @@ config = configparser.ConfigParser()
 parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
-json_headers = json.loads(config['DEFAULT']['json_headers'])
+pwd = config['DEFAULT']['lizard_pwd']
+json_headers = {"username": "__key__",
+                "password": pwd,
+                "Content-Type": "application/json"}
 
 
 def _column_name_generator():
@@ -104,7 +107,7 @@ def post_favourite():
     return new_fav['uuid']
 
 
-def patch_new(idxs1, idxs2, cluster):
+def patch_new(dp, X, Y, idxs1, idxs2, cluster):
     comparison_data = dict()
     point_data = dict()
     for idx1, idx2 in zip(idxs1, idxs2):
@@ -128,19 +131,30 @@ def patch_new(idxs1, idxs2, cluster):
             f.write("%s,%s\n" % (key, point_data[key]))
 
 
-def shuff(samples):
+def shuff(samples, n_blocks, n_samp_per_block):
+    """
+    Randomly shuffle the samples until every sample in a subset is unique.
+    :param samples:  list of samples, indicated by a letter or integer
+    :param n_blocks:
+    :param n_samp_per_block:
+    :return:
+    """
     samples_list = []
-    samples = samples[:50]
     np.random.shuffle(samples)
-    for i in range(10):
-        sample_ids = samples[i * 5:i * 5 + 5]
-        if len(list(set(sample_ids))) < 5:
-            return shuff(samples)
+    samples = samples[:n_blocks * n_samp_per_block]
+    for i in range(n_blocks):
+        sample_ids = samples[i * n_samp_per_block:i * n_samp_per_block + n_samp_per_block]
+        if len(list(set(sample_ids))) < n_samp_per_block:
+            print("re-shuffling; got until", len(samples_list))
+            shuff(samples, n_blocks, n_samp_per_block)
         samples_list.append(sample_ids)
     return samples_list
 
 
 def block_generation(samples):
+    """
+    Generate the comparisons for a 5x5 comparison matrix.
+    """
     A = samples[0]
     B = samples[1]
     C = samples[2]
@@ -158,23 +172,30 @@ def block_generation(samples):
 #
 # dp, X, Y = read_dp_csv(cluster)  # read expert_points.csv
 #
-# samples = list(range(len(dp)))
-# samples2 = list(range(len(dp)))
-# np.random.shuffle(samples2)
-# samples = samples+samples2
-# sample_ids = shuff(samples)
-# block_samples = []
-# for block in sample_ids:
-#     block_samples.append(list(np.sort(block)))
-# # idxs1 = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3]   # first elements of comparison.
-# # idxs2 = [1, 2, 3, 4, 2, 3, 4, 3, 4, 4]   # second elements of comparison.
-# # idxs1 = [0]   # first elements of comparison. A=0, B=1, etc.
-# # idxs2 = [1]   # second elements of comparison. a=27, b=28, etc.
-#
-# for i in range(len(block_samples)):
-#     idxs1, idxs2 = block_generation(block_samples[i])
-#     blockid = 'B'+str(i+1)
-#     patch_new(idxs1, idxs2, cluster+blockid)
+def generate_comparison_lizard(cluster):
+    """
+    From a list of data points, create the comparisons in Lizard.
+    Shuffle the data points and create the comparisons.
+    Then generate the favourite instances.
+    """
+    dp, X, Y = read_dp_csv(cluster)  # read expert_points.csv
+    samples = list(range(len(dp)))
+    samples2 = list(range(len(dp)))
+    np.random.shuffle(samples2)
+    samples = samples+samples2
+    sample_ids = shuff(samples, 10, 5)
+    block_samples = []
+    for block in sample_ids:
+        block_samples.append(list(np.sort(block)))
+    # idxs1 = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3]   # first elements of comparison.
+    # idxs2 = [1, 2, 3, 4, 2, 3, 4, 3, 4, 4]   # second elements of comparison.
+    # idxs1 = [0]   # first elements of comparison. A=0, B=1, etc.
+    # idxs2 = [1]   # second elements of comparison. a=27, b=28, etc.
+
+    for i in range(len(block_samples)):
+        idxs1, idxs2 = block_generation(block_samples[i])
+        blockid = 'B'+str(i+1)
+        patch_new(dp, X, Y, idxs1, idxs2, cluster+blockid)
 
 
 def switch_layer(uuid, bool):
@@ -183,7 +204,7 @@ def switch_layer(uuid, bool):
     new_layer = []
     for l in r['state']['layers']:
         l['active'] = bool
-        l['opacity'] = 1
+        l['opacity'] = 0.3
         # if not l['name'] == "Bodemberging bij gemiddelde hoogste grondwaterstand - Huidig klimaat":
         new_layer.append(l)
     # bodemberging = {
@@ -233,22 +254,24 @@ def new_fav(uuid, X, Y, newname='', override=False):
     print("Patching geometry:", r.status_code, r.reason)
 
 
-def createCNOZb():
-    # uuid = post_favourite()
-    uuid = '78b71e31-4d8b-4823-90fc-29f4da7b13d5'
+def create_fav(point_list):
+    uuid = post_favourite()
+    # uuid = '78b71e31-4d8b-4823-90fc-29f4da7b13d5'
     points, xs, ys = read_dp_csv('WS')
     X, Y = [], []
     for p, x, y in zip(points, xs, ys):
-        if p in list('CNOZb'):
+        if p in list(point_list):
             X.append(x)
             Y.append(y)
     print(X, Y)
-    new_fav(uuid, X, Y, newname='CNOZb')
+    new_fav(uuid, X, Y, newname=point_list)
 
 
 uuid_list = ['78b71e31-4d8b-4823-90fc-29f4da7b13d5'] #['97ffd069-1da0-43f3-964e-cdded4a8565b', '97ffd069-1da0-43f3-964e-cdded4a8565b']
 
 # uuid_list = np.squeeze(uuid_list)
 # print(len(uuid_list), uuid_list)
-for uid in uuid_list:
-    switch_layer(uid, bool=True)
+# for uid in uuid_list:
+#     switch_layer(uid, bool=True)
+point_list = 'CFQST'
+create_fav(point_list)

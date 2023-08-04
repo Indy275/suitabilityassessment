@@ -15,7 +15,11 @@ config = configparser.ConfigParser()
 parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
-json_headers = json.loads(config['DEFAULT']['json_headers'])
+# json_headers = json.loads(config['DEFAULT']['json_headers'])
+pwd = config['DEFAULT']['lizard_pwd']
+json_headers = {"username": "__key__",
+                "password": pwd,
+                "Content-Type": "application/json"}
 
 
 def _column_name_generator():
@@ -74,24 +78,6 @@ def get_fav_data(uuid):
     return r.json(), raster_uuids, col_names
 
 
-def interacting_factors(df):
-    for name, vals in df.items():
-        count = vals[vals != 0.0]
-        print("Factor {} occurs {} times".format(name, len(count)))
-    size_col = df.columns.size
-    for i in range(0, size_col):
-        for j in range(i + 1, size_col):
-            col1 = str(df.columns[i])
-            col2 = str(df.columns[j])
-            nam = col1 + "X" + col2
-            df[nam] = df.get('nam', 0)
-            for index, row in df.iterrows():
-                if row[col1] and row[col2]:
-                    df[nam] = df[nam] + 1
-
-    df.to_csv(data_url + 'wspoint_counts.csv')
-
-
 def get_pointinfo(dp_uuid, cluster):
     read_fav_dp(dp_uuid, cluster)
     r, raster_uuids, col_names = get_fav_data(dp_uuid)
@@ -123,24 +109,41 @@ print([round(min(total_df['Lng']), 4) - 0.01, round(min(total_df['Lat']), 4) - 0
        round(max(total_df['Lat']), 4) + 0.01])
 
 
+def generate_comparisons():
+    """
+    Generate the desired number of blocks of comparisons.
+    """
 
-def shuff(samples):
-    samples_list = []
-    np.random.shuffle(samples)
-    samples = samples[:50]
-    for i in range(10):
-        sample_ids = samples[i * 5:i * 5 + 5]
-        if len(list(set(sample_ids))) < 5:
-            print("re-shuffling; got until", len(samples_list))
-            shuff(samples)
-        samples_list.append(sample_ids)
-    return samples_list
+    def shuff(samples, n_blocks, n_samp_per_block):
+        """
+        Randomly shuffle the samples until every sample in a subset is unique.
+        :param samples:  list of samples, indicated by a letter or integer
+        :param n_blocks:
+        :param n_samp_per_block:
+        :return:
+        """
+        samples_list = []
+        np.random.shuffle(samples)
+        samples = samples[:n_blocks * n_samp_per_block]
+        for i in range(n_blocks):
+            sample_ids = samples[i * n_samp_per_block:i * n_samp_per_block + n_samp_per_block]
+            if len(list(set(sample_ids))) < n_samp_per_block:
+                print("re-shuffling; got until", len(samples_list))
+                shuff(samples, n_blocks, n_samp_per_block)
+            samples_list.append(sample_ids)
+        return samples_list
 
-
-def block_samples():
-    samples = np.repeat(range(len(total_df)), 2)
-    sample_ids = shuff(samples)
-    block_samples = []
-    for block in sample_ids:
-        block_samples.append(list(np.sort(block)))
-    print(block_samples)
+    def block_samples(total_df, n_blocks, n_samp_per_block):
+        """
+        Create ordered list of the subsets of samples
+        """
+        samples = np.repeat(range(len(total_df)), 2)
+        sample_ids = shuff(samples, n_blocks, n_samp_per_block)
+        block_samples = []
+        for block in sample_ids:
+            block_samples.append(list(np.sort(block)))
+        print(block_samples)
+    total_df = pd.read_csv(data_url + "/expert_points_{}.csv".format(cluster))
+    n_blocks = 10
+    n_samp_per_block = 5
+    block_samples(total_df, n_blocks, n_samp_per_block)
