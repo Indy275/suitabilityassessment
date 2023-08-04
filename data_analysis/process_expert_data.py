@@ -3,6 +3,8 @@ import configparser
 import os
 import numpy as np
 import pandas as pd
+# from scipy.stats import gmean
+import scipy.stats as stats
 
 from data_analysis import ahp_util
 
@@ -13,9 +15,10 @@ data_url = config['DEFAULT']['data_url']
 
 
 def set_cluster(cluster):
-    if cluster == 'WS':
+    if cluster == 'ws':
         data_link = 'Bodem en Watersturend WS v2_June 9, 2023_09.44'
         data_link = 'Bodem en Watersturend WS v2_July 24, 2023_15.54'
+        data_link = 'Bodem en Watersturend WS v2_August 3, 2023_14.01'
         start_date = datetime.date(2023, 5, 23)
         locationIDs = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcd')
     else:  # cluster == 'OC':
@@ -25,30 +28,30 @@ def set_cluster(cluster):
     return data_link, start_date, locationIDs
 
 
-def process_experts_indiv(data, locationIDs):
-    weights = pd.DataFrame(columns=locationIDs)
-    n_completed_surveys = 0
-    for index, expert in data.iterrows():
-        df_expert = expert.to_frame().T.dropna(axis=1, how='all')
-        if len(df_expert.columns) > 28:  # A completed survey has 29 columns: 10 comparisons; 6 other question; 13 metadata
-            n_completed_surveys += 1
-            matrix = ahp_util.build_matrix(df_expert)
-            print(df_expert.columns[-9])
-            points = list(df_expert.columns[-10].split('_')[1] + df_expert.columns[-9].split('_')[1][1] +
-                          df_expert.columns[-1].split('_')[1])
-            weight_dict = dict.fromkeys(locationIDs, 0)
-            expertweights = ahp_util.compute_priority_weights(np.squeeze(matrix))
-            for point, exp_weight in zip(points, expertweights):
-                weight_dict[point] = exp_weight
-            print("Expert evaluated:", points, "with these weights:", expertweights,
-                  "(CR: {})".format(ahp_util.compute_consistency_ratio(np.squeeze(matrix))))
-            new_df = pd.DataFrame(weight_dict, index=[0])
-            weights = pd.concat([weights, new_df], ignore_index=True)
-    return weights
+# def process_experts_group(data, locationIDs):
+#     weights = pd.DataFrame(columns=locationIDs)
+#     n_completed_surveys = 0
+#     for index, expert in data.iterrows():
+#         df_expert = expert.to_frame().T.dropna(axis=1, how='all')
+#         if len(df_expert.columns) > 28:  # A completed survey has 29 columns: 10 comparisons; 6 other question; 13 metadata
+#             n_completed_surveys += 1
+#             matrix = ahp_util.build_matrix(df_expert)
+#             points = list(df_expert.columns[-10].split('_')[1] + df_expert.columns[-9].split('_')[1][1] +
+#                           df_expert.columns[-1].split('_')[1])
+#             weight_dict = dict.fromkeys(locationIDs, 0)
+#             expertweights = ahp_util.compute_priority_weights(np.squeeze(matrix))
+#             for point, exp_weight in zip(points, expertweights):
+#                 weight_dict[point] = exp_weight
+#             print("Expert evaluated:", points, "with these weights:", expertweights,
+#                   "(CR: {})".format(ahp_util.compute_consistency_ratio(np.squeeze(matrix))))
+#             new_df = pd.DataFrame(weight_dict, index=[0])
+#             weights = pd.concat([weights, new_df], ignore_index=True)
+#     return weights
 
 
-def process_experts_group(data):
+def process_experts_indiv(data):
     datapoints, weights_dp = [], []
+    crs = []
     for index, expert in data.iterrows():
         df_expert = expert.to_frame().T.dropna(axis=1, how='all')
         if len(df_expert.columns) > 28:  # A completed survey has 29 columns: 10 comparisons; 6 other question; 13 metadata
@@ -59,9 +62,10 @@ def process_experts_group(data):
             for point, exp_weight in zip(points, expertweights):
                 weights_dp.append(exp_weight)
                 datapoints.append(point)
-
-            print("Expert evaluated:", points, "with these weights:", expertweights,
-                  "(CR: {})".format(ahp_util.compute_consistency_ratio(np.squeeze(matrix))))
+            cr = ahp_util.compute_consistency_ratio(np.squeeze(matrix))
+            crs.append(cr)
+            print(f'Expert evaluated {points} with weights: {expertweights} (CR: {cr})')
+    print("consistencyratios",crs)
     return datapoints, weights_dp
 
 
@@ -74,16 +78,25 @@ def run_model(cluster, expert_processing):
     data = ahp_util.read_survey_data(data_link, start_date)
     data.dropna(subset='Q2_1', inplace=True)  # Drop all reports in which weighting question was not answered
     print("Number of participants that completed factorweighting:", len(data))
-    print(data['Q1'])
 
-    if expert_processing.startswith('i'):  # individual
-        weights = process_experts_indiv(data, locationIDs)
-        mean_weight = weights.replace(0, np.NaN).mean(axis=0).replace(np.NaN, 0)
-        mean_std = weights.replace(0, np.NaN).std(axis=0).replace(np.NaN, 0)
-        weights = pd.DataFrame({'Point': locationIDs, 'Value': mean_weight, 'Std': mean_std})
+    if expert_processing.startswith('g'):  # group
+        # weights = process_experts_group(data, locationIDs)
+        # print(weights.shape, weights)
+        # mean_weight = weights.replace(0, np.NaN).mean(axis=0).replace(np.NaN, 0)
+        # weights2 = ahp_util.geo_mean(weights)
+        # print("geomean",weights2)
+        # print("arithm",mean_weight)
+        # mean_std = weights.replace(0, np.NaN).std(axis=0).replace(np.NaN, 0)
+        # weights = pd.DataFrame({'Point': locationIDs, 'Value': mean_weight, 'Std': mean_std})
+        datapoints, weights_raw = process_experts_indiv(data)
+        raw_weights = pd.DataFrame({'Point': datapoints, 'Value': weights_raw})
+        weights = raw_weights.groupby(raw_weights.Point).apply(stats.gmean).to_frame().reset_index()
+        weights.rename(columns={0: 'Value'}, inplace=True)
+        weights['Value'] = weights['Value'].astype(float)
 
-    elif expert_processing.startswith('g'):  # group
-        datapoints, weights = process_experts_group(data)
+    elif expert_processing.startswith('i'):  # individual
+        cluster = cluster + 'all'
+        datapoints, weights = process_experts_indiv(data)
         weights = pd.DataFrame({'Point': datapoints, 'Value': weights})
 
     weights = weights.merge(point_data, on='Point', how='left')

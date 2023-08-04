@@ -12,18 +12,26 @@ config = configparser.ConfigParser()
 parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
+fig_url = config['DEFAULT']['fig_url'][:-4]
 
-cluster = 'OC'
-if cluster == 'WS':
-    numeric_data = 'Bodem en Watersturend WS v2_June 9, 2023_09.44'
-    start_date = datetime.date(2023, 5, 23)
-    locationIDs = list('ABCDEFGHIJKLMNOPQRSTUVWXYZab')
-else:# cluster == 'OC':
-    numeric_data = 'Bodem en Watersturend OC_May 31, 2023_15.14'
-    start_date = datetime.date(2023, 5, 15)
-    locationIDs = list('ABCDE')
 
-data = ahp_util.read_survey_data(numeric_data, datetime.date(2023, 5, 23))
+def set_cluster(cluster):
+    if cluster == 'ws':
+        data_link = 'Bodem en Watersturend WS v2_June 9, 2023_09.44'
+        data_link = 'Bodem en Watersturend WS v2_July 24, 2023_15.54'
+        data_link = 'Bodem en Watersturend WS v2_August 3, 2023_14.01'
+        start_date = datetime.date(2023, 5, 23)
+        locationIDs = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcd')
+    else:  # cluster == 'OC':
+        data_link = 'Bodem en Watersturend OC_May 31, 2023_15.14'
+        start_date = datetime.date(2023, 5, 15)
+        locationIDs = list('ABCDE')
+    return data_link, start_date, locationIDs
+
+cluster = 'oc'
+data_link, start_date, locationIDs = set_cluster(cluster)
+
+data = ahp_util.read_survey_data(data_link, datetime.date(2023, 5, 23))
 data.dropna(subset=['Q1'], inplace=True)  # Drop all reports in which question was not answered
 
 for col in ['Q2_5', 'Q2_4', 'Q2_3', 'Q2_2', 'Q2_1']:
@@ -62,7 +70,6 @@ ylabels = ['Not important',
            'Extremely important',
            'Absolutely important']
 ylabels = ['\n'.join(wrap(y, 10)) for y in ylabels]
-fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/'
 fig_name = fig_url + cluster + '_factorweights'
 
 plt.boxplot(data[['Q2_1', 'Q2_2', 'Q2_3', 'Q2_4', 'Q2_5']])
