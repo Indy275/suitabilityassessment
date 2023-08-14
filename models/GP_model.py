@@ -24,10 +24,11 @@ fig_url = config['DEFAULT']['fig_url']
 plot_data = int(config['PLOTTING']['plot_data'])
 plot_pred = int(config['PLOTTING']['plot_prediction'])
 plot_feature_importance = int(config['PLOTTING']['plot_feature_importance'])
-plot_variance = int(config['PLOTTING']['plot_feature_importance'])
+plot_variance = int(config['PLOTTING']['plot_variance'])
 digitize = int(config['PLOTTING']['digitize_prediction'])
 sigmoidal_tf = int(config['PLOTTING']['sigmoid_prediction'])
 coords_as_features = config.getboolean('DATA_SETTINGS', 'coords_as_features')
+plot_features = int(config['PLOTTING']['plot_features'])
 
 
 def save_imp(imp, names, model, modifier):
@@ -244,7 +245,9 @@ def plot_feature(data_loader, model, likelihood, ind):
 
 
 def run_model(train_mod, test_mod):
-    x_subset = True
+    x_subset = False
+    contour = True
+
     train_data = data_loader.DataLoader(train_mod, ref_std='expert_ref')
     test_data = data_loader.DataLoader(test_mod, ref_std='testdata')
 
@@ -275,13 +278,15 @@ def run_model(train_mod, test_mod):
     coord_nu, feat_nu, num_steps, lr, lasso = set_hypers()
 
     if coords_as_features:
-        feature_dims = tuple(list(range(len(x_indices)))[2:])
         coord_kernel = ScaleKernel(MaternKernel(nu=coord_nu, ard_num_dims=2, active_dims=(0, 1)))
-        kernels = {'RBF': ScaleKernel(RBFKernel(ard_num_dims=len(x_indices[2:]), active_dims=feature_dims)),
-                   'Matern': ScaleKernel(MaternKernel(nu=feat_nu, ard_num_dims=len(x_indices[2:]), active_dims=feature_dims))}
+        feature_dims = tuple(list(range(len(x_indices)))[2:])
+        n_dims = len(x_indices[2:])
     else:
-        kernels = {'RBF': ScaleKernel(RBFKernel(ard_num_dims=len(x_indices), active_dims=tuple(range(len(x_indices))))),
-                   'Matern': ScaleKernel(MaternKernel(nu=feat_nu, ard_num_dims=len(x_indices), active_dims=tuple(range(len(x_indices)))))}
+        feature_dims = tuple(range(len(x_indices)))
+        n_dims = len(x_indices)
+
+    kernels = {'RBF': ScaleKernel(RBFKernel(ard_num_dims=n_dims, active_dims=feature_dims)),
+               'Matern': ScaleKernel(MaternKernel(nu=feat_nu, ard_num_dims=n_dims, active_dims=feature_dims))}
 
     for k_name, feature_kernel in kernels.items():
         if coords_as_features:
@@ -292,36 +297,26 @@ def run_model(train_mod, test_mod):
                                                   num_steps=num_steps, lr=lr, lasso=lasso)
         y_preds = predict(test_lnglat, X_test_tensor, test_nans, model, likelihood)
 
-        if digitize:
-            n_quantiles = 11
-            quantiles = np.linspace(0, 1, n_quantiles)
-            y_preds[~test_nans, 2] = np.digitize(y_preds[~test_nans, 2],
-                                                 np.nanquantile(y_preds[~test_nans, 2], quantiles))
-        elif sigmoidal_tf:
-            print("preds were in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 2]), np.nanmax(y_preds[:, 2])))
-            sigmoid = lambda x: 1 / (1 + np.exp(-.5 * (x - .5)))
-            y_preds[~test_nans, 2] = sigmoid(y_preds[~test_nans, 2])
-            print("preds now in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 2]), np.nanmax(y_preds[:, 2])))
+        y_preds[~test_nans, 2] = plot.adjust_predictions(y_preds[~test_nans, 2], digitize=digitize, sigmoidal_tf=sigmoidal_tf)
 
         if plot_pred:
             fig_name = fig_url + '/' + test_mod + '_' + train_mod + '_GP' + k_name
             fig_title = f'GP-{k_name} kernel predictions trained on {train_mod} labels'
-            if train_mod == test_mod:  # plot train labels on top of prediction
+            train_labs = None
+
+            if train_mod[:2] == test_mod[:2]:  # plot train labels on top of prediction
                 train_labs = np.column_stack([train_lnglat[:, 0], train_lnglat[:, 1], y_train])
-                plot.plot_prediction(y_preds, test_size, fig_name, title=fig_title, train_labs=train_labs, contour=True, bg=bg_test,
-                                     savefig=True)
-            else:
-                plot.plot_prediction(y_preds, test_size, fig_name, title=fig_title, contour=True, bg=bg_test, savefig=True)
+            plot.plot_prediction(y_preds, test_size, fig_name, title=fig_title, train_labs=train_labs, contour=contour, bg=bg_test, savefig=True)
 
         if plot_variance:
             fig_title = f'GP-{k_name} kernel variance trained on {train_mod} labels'
-            y_preds[:, 2] = y_preds[:, 3] * -1  # Swap to plot variance; negated because high variance is worse
-            if train_mod == test_mod:  # plot train labels on top of prediction
+            y_preds[:, 2] = plot.adjust_predictions(y_preds[:, 3] * -1)  # Swap to plot variance; negated because high variance is worse
+            if train_mod[:2] == test_mod[:2]:  # plot train labels on top of prediction
                 train_labs = np.column_stack([train_lnglat[:, 0], train_lnglat[:, 1], y_train])
-                plot.plot_prediction(y_preds, test_size, title=fig_title, train_labs=train_labs, contour=True,
+                plot.plot_prediction(y_preds, test_size, title=fig_title, train_labs=train_labs, contour=contour,
                                      bg=bg_test, savefig=False)
             else:
-                plot.plot_prediction(y_preds, test_size, title=fig_title, contour=True, bg=bg_test, savefig=False)
+                plot.plot_prediction(y_preds, test_size, title=fig_title, contour=contour, bg=bg_test, savefig=False)
 
         if plot_feature_importance and not k_name == 'Linear':
             print('ARD lengthscale: ', ls)
@@ -333,4 +328,5 @@ def run_model(train_mod, test_mod):
         if test_mod.startswith(('ws', 'oc')):  # test labels exist only for these data sets
             evaluate(test_mod, model, likelihood, x_indices)
 
-        plot_feature(train_data, model, likelihood, x_indices)
+        if plot_features:
+            plot_feature(train_data, model, likelihood, x_indices)

@@ -36,13 +36,13 @@ def run_model(mod):
     contour = True
 
     start_time = time.time()
-    weights = pd.read_csv(data_url + f'/factorweights_{cluster}.csv')
+    weights = pd.read_csv(data_url + f'/factorweights_{cluster.upper()}.csv')
     weights = list(weights['Median'])
+    weights = [w/max(weights) for w in weights]
     data = data_loader.DataLoader(mod, ref_std='testdata')
     unweighted_df, nans, lnglat, size, col_names = data.preprocess_input()
     if coords_as_features:
         unweighted_df = unweighted_df[:, 2:]  # Always exclude longitude and latitude: importance not measured
-    # df_orig = data.load_orig_df()
 
     bg = data.load_bg()
     unweighted_df[nans] = 0
@@ -50,20 +50,11 @@ def run_model(mod):
     preds[:, 0] = lnglat[:, 0]  # test longitude
     preds[:, 1] = lnglat[:, 1]  # test latitude
     preds[:, 2] = predict(unweighted_df, nans, weights)
-
-    if digitize:
-        n_quantiles = 11
-        quantiles = np.linspace(0, 1, n_quantiles)
-        quantiles = [0, 0.2, 0.45, 0.5, 0.55, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0]  # non-linear: more red categories
-        preds[~nans, 2] = np.digitize(preds[~nans, 2], np.nanquantile(preds[~nans, 2], quantiles))
-    elif sigmoidal_tf:
-        sigmoid = lambda x: 1 / (1 + np.exp(-5 * (x - .5)))
-        preds[~nans, 2] = sigmoid(preds[~nans, 2])
+    preds[~nans, 2] = plot.adjust_predictions(preds[~nans, 2], digitize=digitize, sigmoidal_tf=sigmoidal_tf)
 
     fig_name = '/' + cluster
     if mod == 'noordhollandHiRes': fig_name += '_NH-HR'
     elif mod == 'noordholland': fig_name += '_NH'
-    if contour: fig_name += '_cont'
     if digitize: fig_name += '_dig'
     if sigmoidal_tf: fig_name += '_sig'
     print(f'Plot took {time.time() - start_time} seconds to create {fig_name} map')
@@ -71,12 +62,7 @@ def run_model(mod):
     if mod in ['ws', 'oc']:  # plot train labels on top of prediction
         loader = data_loader.DataLoader(mod, ref_std='expert_ref')
         train_labs = np.column_stack([loader.lnglat[:, 0], loader.lnglat[:, 1], loader.y])
-        print("trainlabs", train_labs)
         plot.plot_prediction(preds, data.size, fig_url+fig_name, title=fig_title, train_labs=train_labs, contour=contour,
                              bg=bg, savefig=True)
     else:
         plot.plot_prediction(preds, data.size, fig_url+fig_name, title=fig_title, contour=contour, bg=bg, savefig=True)
-
-
-# run_model('WS', 'noordholland', contour=True)
-# run_model('OC', 'noordholland', contour=True)

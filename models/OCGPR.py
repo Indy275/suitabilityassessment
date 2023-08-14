@@ -16,8 +16,9 @@ import matplotlib.pyplot as plt
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+fig_url = config['DEFAULT']['fig_url']
 plot_data = int(config['PLOTTING']['plot_data'])
-plot_pred = int(config['PLOTTING']['plot_pred'])
+plot_pred = int(config['PLOTTING']['plot_prediction'])
 
 
 def set_hypers():
@@ -72,7 +73,6 @@ class OCGP():
             if np.size(self.var) == 0:
                 self.var = [a - b for a, b in zip(self.Kss, sum(np.multiply(self.v, self.v)))]
             score = np.log(np.divide(np.dot(np.transpose(self.Ks), self.alpha), np.sqrt(self.var)))
-
         return score
 
     def seKernel(self, x, y, ls, svar=0.0045):
@@ -131,7 +131,7 @@ class OCGP():
 
     def adaptiveHyper(self, x, p):
         dist = self.knn(x, p)
-        ls = dist[:, p - 1]
+        ls = dist[:, p - 1] + 1e-5
         return ls
 
     def scaledHyper(self, x, y, N):
@@ -229,18 +229,18 @@ def run_model(train_mod, test_mod):
         ocgp = OCGP()
 
         if kernel == "se":
-            title = f'SE kernel with ls={ls}, svar={svar}'
+            title = f'Standard SE kernel with ls={ls}, svar={svar}'
             ocgp.seKernel(X_train, X_test_part, ls, svar)
         elif kernel == "adaptive":
             ls = ocgp.adaptiveHyper(X_train, p)
-            ls = np.log(ls)
-            title = f'Adaptive hyper with svar={svar}, p={p}, and learned ls={ls}'
+            title = f'Adaptive kernel with svar={svar}, p={p}'
             # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
             ocgp.adaptiveKernel(X_train, X_test_part, ls, svar)
         elif kernel == "scaled":
             # X_train, X_test = ocgp.preprocessing(X_train, X_test, "minmax",True)
             meanDist_xn, meanDist_yn = ocgp.scaledHyper(X_train, X_test_part, N)
-            title = f'Scaled hyper with svar={svar}, v={v}, N={N}'
+            title = f'Scaled kernel with svar={svar}, v={v}, N={N}'
+            print("Scaled hyperparams computed")
             ocgp.scaledKernel(X_train, X_test_part, v, meanDist_xn, meanDist_yn, svar)
         else:
             print(f'Not implemented: {kernel=}')
@@ -260,6 +260,8 @@ def run_model(train_mod, test_mod):
         elif part == 3:
             y_preds[half_size:, half_size:, :] = y_preds_part.reshape((half_size, half_size, 4))
 
+    print(y_preds, y_preds.shape)
+
     mse_text = ['', '', '','']
     if test_mod in ['oc', 'ws']:  # performance quantification only possible if expert labels are available
         mse = evaluate(X_train, test_mod, ls, svar)
@@ -268,7 +270,6 @@ def run_model(train_mod, test_mod):
     if plot_pred:
         titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
                   r'log. moment ratio $\mu_*/\sigma_*$']
-        fig_url = 'C://Users/indy.dolmans/OneDrive - Nelen & Schuurmans/Pictures/maps/'
         name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
         for i in range(len(titles)):
             X1 = test_lnglat[:, 0]

@@ -9,8 +9,13 @@ def plot_f_importances(coef, names):
     plot_pred.plot_f_importances(coef, names)
 
 
-def plot_prediction(y_pred, size, figname=None, title='',train_labs=None, contour=True, bg=None, savefig=True):
-    plot_pred.plot_prediction(y_pred, size, fig_name=figname, title=title, train_labs=train_labs, contour=contour, bg=bg, savefig=savefig)
+def adjust_predictions(y, digitize=False, sigmoidal_tf=False):
+    return plot_pred.adjust_predictions(y, digitize=digitize, sigmoidal_tf=sigmoidal_tf)
+
+
+def plot_prediction(y_pred, size, figname=None, title='', train_labs=None, contour=True, bg=None, savefig=True):
+    plot_pred.plot_prediction(y_pred, size, fig_name=figname, title=title, train_labs=train_labs, contour=contour,
+                              bg=bg, savefig=savefig)
 
 
 def plot_loss(loss):

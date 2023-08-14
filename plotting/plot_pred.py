@@ -10,13 +10,16 @@ from collections import Counter
 
 
 def set_colmap():
-    colmap = LinearSegmentedColormap.from_list('colmap2', [[1, 0, 0, 1], [145 / 255, 210 / 255, 80 / 255, 1]])  # label
+    colmap = LinearSegmentedColormap.from_list('colmap2', [[1, 0, 0, 1],
+                                                           [211 / 255, 146 / 255, 58 / 255],
+                                                           [145 / 255, 210 / 255, 80 / 255, 1]])  # label
     # colmap = LinearSegmentedColormap.from_list('colmap2', [[145 / 255, 210 / 255, 80 / 255, 1], [1, 0, 0, 1]])  # msk
     try:
         plt.register_cmap(cmap=colmap)
     except:
         pass
     plt.set_cmap(colmap)
+    # colmap = mpl.cm.get_cmap('viridis')
     return colmap
 
 
@@ -44,12 +47,28 @@ def plot_f_importances(coef, names):
     plt.show()
 
 
+def adjust_predictions(y, digitize, sigmoidal_tf):
+    if digitize:
+        n_quantiles = 5
+        plt.hist(y, bins=30, edgecolor='k')
+        plt.show()
+        quantiles = np.linspace(0, 1, n_quantiles)
+        y = np.digitize(y, np.nanquantile(y, quantiles))
+        plt.hist(y, edgecolor='k')
+        plt.show()
+    elif sigmoidal_tf:
+        plt.hist(y, bins=30, edgecolor='k')
+        plt.show()
+        sigmoid = lambda x: 1 / (1 + np.exp(-.5 * (x - .5)))
+        y = sigmoid(y)
+        plt.hist(y, edgecolor='k')
+        plt.show()
+    return y
+
 def plot_prediction(y_preds, test_size, fig_name=None, title='', train_labs=None, contour=True, bg=None, savefig=True):
     X1 = y_preds[:, 0]
     X2 = y_preds[:, 1]
     y_preds[:, 2] = np.ma.masked_invalid(y_preds[:, 2])
-    print("x1 are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 0]), np.nanmax(y_preds[:, 0])))
-    print("x2 are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 1]), np.nanmax(y_preds[:, 1])))
 
     print("predictions are in range [{0:.3f},{1:.3f}]".format(np.nanmin(y_preds[:, 2]), np.nanmax(y_preds[:, 2])))
 
@@ -60,17 +79,22 @@ def plot_prediction(y_preds, test_size, fig_name=None, title='', train_labs=None
     except:
         width, height = bg.shape[0], bg.shape[1]
     ratio = height / width
-    # plt.imshow(bg, extent=[np.min(X1), np.max(X1), np.min(X2), np.max(X2)], origin='upper', aspect=ratio)
     plt.imshow(bg, origin='upper', aspect=ratio,
-               extent=[np.nanmin(X1) - 0.0005, np.nanmax(X1) - 0.0005, np.nanmin(X2) + 0.0017, np.nanmax(X2) + 0.0017])
+               extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)])
     if not contour:
-        plt.imshow(y_preds[:, 2].reshape((test_size, test_size)), alpha=0.55, cmap=cmap,
+        plt.imshow(y_preds[:, 2].reshape((test_size, test_size)), alpha=0.65, cmap=cmap,
                    extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)], aspect=ratio)
     else:
         plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
-                     cmap=cmap, origin='upper', alpha=0.55)
+                     cmap=cmap, origin='upper', alpha=0.65)
         if savefig:
-            fig_name += '_contour'
+            fig_name += '_cont'
+
+    cbar = plt.colorbar()
+    mn = np.nanmin(y_preds[:, 2])  # colorbar min value
+    mx = np.nanmax(y_preds[:, 2])  # colorbar max value
+    cbar.set_ticks([mn, mx])
+    cbar.set_ticklabels(['Less suitable', 'More suitable'])
 
     if train_labs is not None:
         points = [Point(x1, x2) for x1, x2 in train_labs[:, :2]]
