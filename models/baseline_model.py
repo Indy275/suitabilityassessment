@@ -43,7 +43,6 @@ def train(X_train, y_train, model):
         feature_imp = predictor.feature_importances_
 
     elif model == 'svm':
-        # posfeat = [feat for feat, lab in zip(X_train, y_train) if lab > 0]
         kernel = 'linear'  # 'linear'  'rbf'
         predictor = OneClassSVM(kernel=kernel)
         predictor.fit(X=X_train)
@@ -69,13 +68,14 @@ def predict(LngLat, X_test, test_nans, model, predictor):
 
     elif model == 'svm':
         y_pred = predictor.score_samples(X_test)
+        hist, bins = np.histogram(y_pred, bins=5)
+        y_pred = np.digitize(y_pred, bins)
 
     else:
         print("Invalid model; should be one of ['gbr','svm']")
         return
 
     y_preds[~test_nans, -1] = y_pred
-    # pd.DataFrame(y_preds).to_csv(data_url + '/' + test_mod + "/" + model + "_pred.csv")
     return y_preds
 
 
@@ -141,6 +141,10 @@ def run_model(train_mod, test_mod, model, ref_std):
 
     X_train, y_train, train_lnglat, train_col_names = train_data.preprocess_input()
     X_test, test_nans, test_lnglat, test_size, test_col_names = test_data.preprocess_input()
+
+    # Due to strange labels, this appears necessary
+    train_nans = np.isnan(X_train).any(axis=1)
+    X_train = X_train[~train_nans, :]
 
     bg_test = test_data.load_bg()
     assert train_col_names == test_col_names

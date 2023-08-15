@@ -190,7 +190,7 @@ def run_model(train_mod, test_mod):
     test_data = data_loader.DataLoader(test_mod, ref_std='testdata')
 
     X_train, y_train, train_lnglat, train_col_names = train_data.preprocess_input()
-    X_testdata, test_nans, test_lnglat, test_size, test_col_names = test_data.preprocess_input()
+    X_test, test_nans, test_lnglat, test_size, test_col_names = test_data.preprocess_input()
     n_feats = X_train.shape[-1]
 
     bg_test = test_data.load_bg()
@@ -202,8 +202,9 @@ def run_model(train_mod, test_mod):
     kernel, v, N, svar, ls, p = set_hypers()
 
     y_preds = np.zeros((test_size, test_size, 4))
-    X_test = np.zeros((test_size * test_size, n_feats))
-    X_test[~test_nans] = X_testdata
+    # X_test = np.zeros((test_size * test_size, n_feats))
+    # print(X_test.shape, test_nans.shape, X_testdata.shape, np.sum(test_nans))
+    # X_test[~test_nans] = X_testdata
     X_test = X_test.reshape((test_size, test_size, -1))
     half_size = int(test_size / 2)
     partitions = [X_test[:half_size, :half_size],
