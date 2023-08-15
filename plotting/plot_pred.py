@@ -49,21 +49,27 @@ def plot_f_importances(coef, names):
 
 def adjust_predictions(y, digitize, sigmoidal_tf):
     if digitize:
-        n_quantiles = 5
+        n_quantiles = 11
         plt.hist(y, bins=30, edgecolor='k')
+        plt.title("Histogram before applying digitization")
         plt.show()
         quantiles = np.linspace(0, 1, n_quantiles)
         y = np.digitize(y, np.nanquantile(y, quantiles))
         plt.hist(y, edgecolor='k')
+        plt.title("Histogram after applying digitization")
+        plt.xticks(range(n_quantiles), [f' {i + 1}' for i in range(n_quantiles)])
         plt.show()
     elif sigmoidal_tf:
         plt.hist(y, bins=30, edgecolor='k')
+        plt.title("Histogram before applying \n sigmoid transformation")
         plt.show()
         sigmoid = lambda x: 1 / (1 + np.exp(-.5 * (x - .5)))
         y = sigmoid(y)
         plt.hist(y, edgecolor='k')
+        plt.title("Histogram after applying \n sigmoid transformation")
         plt.show()
     return y
+
 
 def plot_prediction(y_preds, test_size, fig_name=None, title='', train_labs=None, contour=True, bg=None, savefig=True):
     X1 = y_preds[:, 0]
