@@ -28,6 +28,7 @@ def set_cluster(cluster):
         locationIDs = list('ABCDE')
     return data_link, start_date, locationIDs
 
+
 cluster = 'oc'
 data_link, start_date, locationIDs = set_cluster(cluster)
 

@@ -15,7 +15,7 @@ def geo_mean(iterable):
 
 
 def read_dp_csv(cluster):
-    df = pd.read_csv(data_url + "/expert_point_info_{}.csv".format(cluster))
+    df = pd.read_csv(data_url + f"/expert_point_info_{cluster[:2]}.csv")
     return df['Point'], df['Lng'], df['Lat']
 
 
@@ -66,34 +66,18 @@ def compute_priority_weights(matrix):
     :param matrix: pairwise nxn comparison matrix
     :return: priority vector size n
     """
-    return list(np.mean(matrix / np.sum(matrix, axis=0), axis=1))
-
-
-def compute_priority_weights_aggregate(matrix):
-    """
-    Computes the priority weights of elements in a pairwise comparison matrix.
-    Takes the geometric mean of the matrices, then continues with a nxn matrix.
-    First normalizes column-wise, then aggregates row-wise.
-    See e.g. https://www.spicelogic.com/docs/ahpsoftware/intro/ahp-calculation-methods-396 for explanation
-    Only works if every expert evaluated the same elements.
-    :param matrix: pairwise mxnxn comparison matrix with m the number of experts, n the matrix size
-    :return: priority vector size n
-    """
-    geomatrix = [geo_mean(matrix[:, i, j]) for i in range(matrix.shape[1]) for j in range(matrix.shape[2])]
-    geomatrix = np.reshape(geomatrix, (matrix.shape[1], matrix.shape[2]))
-    return list(np.mean(geomatrix / np.sum(geomatrix, axis=0), axis=1))
+    return list(np.mean(matrix / np.sum(matrix, axis=0), axis=1).round(4))
 
 
 def compute_consistency_ratio(matrix):
     n = len(matrix)
     lambda_max = np.max(np.linalg.eigvals(matrix))
     consistency_index = (lambda_max - n) / (n - 1)
+    print("lambdamax , n",lambda_max, n)
 
     ri_dict = {3: 0.52, 4: 0.89, 5: 1.11, 6: 1.25, 7: 1.35, 8: 1.40, 9: 1.45,
                10: 1.49, 11: 1.52, 12: 1.54, 13: 1.56, 14: 1.58, 15: 1.59}
 
     random_index = ri_dict[n]
-
     consistency_ratio = np.real(consistency_index / random_index)
-
     return consistency_ratio
