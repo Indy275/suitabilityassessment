@@ -1,5 +1,7 @@
 import json
 import os.path
+
+import matplotlib.pyplot as plt
 import requests
 import configparser
 from joblib import dump
@@ -29,7 +31,7 @@ recreate_labs = config.getboolean('DATA_SETTINGS', 'recreate_labs')
 recreate_feats = config.getboolean('DATA_SETTINGS', 'recreate_feats')
 
 
-def concoo(d0_loc):  # convert_coordinates
+def convert_coordinates(d0_loc):
     # inProj = Proj(init='epsg:4326')  # world coordinates
     # outProj = Proj(init='epsg:28992')  # Dutch coordinates
     # d0_x0, d0_x1 = transform(inProj,outProj, d0_loc[0], d0_loc[1])
@@ -40,11 +42,12 @@ def concoo(d0_loc):  # convert_coordinates
 
 
 def create_bg(mod, bbox):
-    bbox = [float(i[0:-1]) for i in bbox.split()]
-    NH_w = 5.37725914616264 - 4.52690620343425  # MaxLng - minLng
+    NH_w = 5.37725914616264 - 4.52690620343425  # maxLng - minLng
     NH_h = 53.21427409446518 - 52.36877567446727  # maxLat - minLat
-    poly_bbox = (
-    concoo([bbox[0], bbox[3]]), concoo([bbox[2], bbox[3]]), concoo([bbox[2], bbox[1]]), concoo([bbox[0], bbox[1]]))
+    poly_bbox = (convert_coordinates([bbox[0], bbox[3]]),
+                 convert_coordinates([bbox[2], bbox[3]]),
+                 convert_coordinates([bbox[2], bbox[1]]),
+                 convert_coordinates([bbox[0], bbox[1]]))
     poly = Polygon(poly_bbox)
     with rasterio.open(data_url + '/background.tif') as src:  # Read raster data from disk
         arr = src.read(1)
@@ -65,7 +68,42 @@ def create_bg(mod, bbox):
         dst.write(clipped_dataset)
 
 
+def mask_area(url, geotiff_name, geotiff_name_msk):
+    # print("url=",url)
+    gdf = gpd.read_file(url)
+    # print("gdf",gdf.head())
+    # gdf2 = gpd.read_file(url2)
+    # print(gdf1.crs, gdf2.crs, gdf1.head(), gdf2.head())
+    # gdf = gpd.GeoDataFrame(pd.concat([gdf1, gdf2], ignore_index=True), crs=[gdf1, gdf2][0].crs)
+    # print(gdf.head())
+
+    nodata_val = -9999
+    with rasterio.open(geotiff_name) as src:  # Read raster data from disk
+        raster_data = src.read()
+        # print("src", raster_data)
+        raster_data[raster_data < 0] = 0  # NaN is indicated with -9999, set to 0
+        raster_meta = src.meta
+
+    with rasterio.open(geotiff_name, 'w', **raster_meta) as dst:  # Write modified raster data to disk
+        dst.write(raster_data)
+    with rasterio.open(geotiff_name) as src:  # Read raster data from disk
+        gdf.to_crs(crs=src.meta['crs'], inplace=True)
+        masked_data, masked_transform = rasterio.mask.mask(src, gdf.geometry, nodata=nodata_val, filled=True,
+                                                           all_touched=False, invert=False)
+    raster_meta.update({
+        'height': masked_data.shape[1],
+        'width': masked_data.shape[2],
+        'transform': masked_transform * src.transform,
+        'crs': src.crs,
+        'nodata': nodata_val
+    })
+
+    with rasterio.open(geotiff_name_msk, 'w', **raster_meta) as dst:  # Write masked data
+        dst.write(masked_data)
+
+
 def get_raster_data(raster_url, modifier, name, bbox, size):
+    geotiff_name_msk_temp = data_url + '/rasters/' + modifier + '/' + name + '_tempmsk.tiff'
     geotiff_name_msk = data_url + '/rasters/' + modifier + '/' + name + '_msk.tiff'
 
     if not Path(geotiff_name_msk).is_file() or recreate_feats:
@@ -80,30 +118,12 @@ def get_raster_data(raster_url, modifier, name, bbox, size):
                 for data in r.iter_content(None):
                     f.write(data)
 
-        gdf = gpd.read_file(data_url + '/water_shp/invertedwatergangHHNK.shp')
-        nodata_val = -9999
-        with rasterio.open(geotiff_name) as src:  # Read raster data from disk
-
-            raster_data = src.read()
-            raster_data[raster_data < 0] = 0  # NaN is indicated with -9999, set to 0
-            raster_meta = src.meta
-
-        with rasterio.open(geotiff_name, 'w', **raster_meta) as dst:  # Write modified raster data to disk
-            dst.write(raster_data)
-        with rasterio.open(geotiff_name) as src:  # Read raster data from disk
-            gdf.to_crs(crs=src.meta['crs'], inplace=True)
-            masked_data, masked_transform = rasterio.mask.mask(src, gdf.geometry, nodata=nodata_val, filled=True,
-                                                               all_touched=True, invert=False)
-        raster_meta.update({
-            'height': masked_data.shape[1],
-            'width': masked_data.shape[2],
-            'transform': masked_transform * src.transform,
-            'crs': src.crs,
-            'nodata': nodata_val
-        })
-
-        with rasterio.open(geotiff_name_msk, 'w', **raster_meta) as dst:  # Write data masked with watergangen
-            dst.write(masked_data)
+        wegen = data_url + '/wegen_inverted.shp'
+        watergangen = data_url + '/water_shp/invertedwatergangHHNK.shp'
+        natura2000 = data_url + '/Natura2000inverted.shp'
+        mask_area(watergangen, geotiff_name, geotiff_name_msk)
+        # mask_area(wegen, geotiff_name, geotiff_name_msk)
+        # mask_area(natura2000, geotiff_name, geotiff_name_msk)
 
     with rasterio.open(geotiff_name_msk) as f:  # Read raster data from disk
         data = f.read()
@@ -125,12 +145,13 @@ def get_labels(ref_std, modifier, copy):
         print(f'(Re)creating layer; retrieving {ref_std} labels')
 
         if ref_std == 'expert_ref':
-            df = pd.read_csv(data_url + '/expertscores_{}.csv'.format(modifier), header=[0])
+            expert_ref_source = 'expertscores_{}'.format(modifier)
+            df = pd.read_csv(data_url + f'/{expert_ref_source}.csv', header=[0])
             gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.Lng, df.Lat))
             shapes = [(geom, value) for geom, value in zip(gdf['geometry'], gdf['Value'])]
 
         elif ref_std == 'hist_buildings':
-            hist_bld_source = 'HHNKpre1900filtered'
+            hist_bld_source = 'HHNKpre1900filtered'#'HHNKpre1860filtered'
             gdf = gpd.read_file(data_url + f'/{hist_bld_source}.shp')
             gdf.to_crs(crs='EPSG:4326', inplace=True)
             gdf['value'] = 1
@@ -145,7 +166,7 @@ def get_labels(ref_std, modifier, copy):
 
         with rasterio.open(geotiff_name, 'w+', **meta) as out:
             out_arr = out.read(1)
-            burned = features.rasterize(shapes=shapes, out=out_arr, transform=out.transform, fill=0)
+            burned = features.rasterize(shapes=shapes, out=out_arr, transform=out.transform, fill=0)  # , all_touched=True
             out.write_band(1, burned)
 
     with rasterio.open(geotiff_name) as f:  # Read raster data from disk
@@ -218,13 +239,12 @@ def create_df(modifier, bbox, size, ref_std, test=False):
 
     if ref_std == 'expert_ref' and not test:
         data, col_names = get_expert_data(modifier)
-
     else:
         data, col_names = get_fav_data(modifier, ref_std, bbox, size, test=test)
 
     # Change outlier values: cut-off at threshold
     df = pd.DataFrame(data, columns=col_names)
-    thresholds = [6, 6, 1000, 1.5, 1000]  # 6m primary; 6m regional; 100mm subsid; 1.5m waterdepth; 2.5m soil capacity
+    thresholds = [6, 6, 1000, 1.5, 1000]  # 6m primary; 6m regional; 1000mm subsid; 1.5m waterdepth; 1000m soil capacity
     for i, column in enumerate(df.columns[2:-1]):
         df.loc[df[column] > thresholds[i], column] = thresholds[i]
 
@@ -239,5 +259,6 @@ def create_df(modifier, bbox, size, ref_std, test=False):
 
     model = 'testdata' if test else ref_std
     df.to_csv(data_url + '/' + modifier + "/" + model + ".csv", index=False)
+
     dump(ss, data_url + '/' + modifier + "/" + model + "_scaler.joblib")
     print("Data with shape {} saved to {}/{}.csv".format(data_conc.shape, modifier, model))
