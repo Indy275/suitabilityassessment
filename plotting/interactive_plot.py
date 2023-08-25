@@ -15,6 +15,7 @@ parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 
 data_url = config['DEFAULT']['data_url']
+cluster = config['EXPERT_SETTINGS']['cluster']
 
 sign = [-1, -1, -1, -1, -1]  # 1 if higher is better; -1 if lower is better
 
@@ -24,10 +25,12 @@ class DashApp():
         self.app = Dash(__name__)
         if w_model:
             if w_model == 'expert':
-                weights_init = pd.read_csv(data_url + "/factorweights_OC.csv")
+                weights_init = pd.read_csv(data_url + f"/factorweights_{cluster}.csv")
                 weights_init = weights_init['Median']
             else:
-                weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
+                # weights_init = pd.read_csv(data_url + "/" + modifier + "/" + w_model + '_fimp.csv')
+                weights_init = pd.read_csv(data_url + "/" + modifier + "/" + 'GP_RBF' + '_fimp.csv')
+
                 weights_init = weights_init['importance']
         else:
             weights_init = np.repeat([1], 5)
@@ -46,6 +49,8 @@ class DashApp():
         if unweighted_df.shape[-1] == 7:
             unweighted_df = unweighted_df[:, 2:]
             col_names = col_names[2:]
+
+        df_orig = df_orig[:, 2:]
 
         unweighted_df[nans] = 0
         df_orig[nans] = 0
@@ -115,7 +120,7 @@ class DashApp():
             weighted_df[weighted_df == nullval] = weighted_df.min()-0.001
             colmap = [[0.0, 'rgb(31,119,180)'], [0.00001, 'rgb(255,0,0)'], [1.0, 'rgb(145,210, 80)']]
             fig = px.imshow(weighted_df, labels=dict(color='suitability_score'),
-                            color_continuous_scale=colmap, aspect="auto", width=500, height=500*ratio)
+                            color_continuous_scale=colmap, width=430, height=700)
 
             fig.update_layout(
                 plot_bgcolor='blue',
@@ -146,11 +151,3 @@ class DashApp():
 
     def run(self):
         self.app.run_server(debug=True)
-
-
-# test_mod = 'noordholland'
-# test_w = test_h = 1000
-# ml_model = 'svm'
-#
-# plot = DashApp(modifier=test_mod, w=test_w, h=test_h, w_model=ml_model)
-# plot.run()

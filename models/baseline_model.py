@@ -1,23 +1,20 @@
 import configparser
-
-import geopandas
 import numpy as np
 import pandas as pd
-import rasterio
-from rasterio.plot import show
-from geocube.api.core import make_geocube
+import os
 
 from data_util import data_loader
 from plotting import plot
 
-
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.svm import OneClassSVM
+from sklearn.svm import OneClassSVM, SVR
+from sklearn.inspection import permutation_importance
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 config = configparser.ConfigParser()
-config.read('config.ini')
+parent = os.path.dirname
+config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 
 data_url = config['DEFAULT']['data_url']
 fig_url = config['DEFAULT']['fig_url']
@@ -38,9 +35,16 @@ def save_imp(imp, names, model, modifier):
 
 def train(X_train, y_train, model):
     if model == 'gbr':
-        predictor = GradientBoostingRegressor()
+        predictor1 = GradientBoostingRegressor()
+        predictor1.fit(X_train, y_train)
+        feature_imp = predictor1.feature_importances_
+        print(feature_imp, "gbr")
+        predictor = SVR(kernel='linear')
         predictor.fit(X_train, y_train)
-        feature_imp = predictor.feature_importances_
+        results = permutation_importance(predictor1, X_train, y_train, scoring='neg_mean_squared_error', n_repeats=10)
+        importance = results.importances_mean
+        for i, v in enumerate(importance):
+            print('Feature: %0d, Score: %.5f' % (i, v))
 
     elif model == 'svm':
         kernel = 'linear'  # 'linear'  'rbf'

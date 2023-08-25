@@ -50,24 +50,32 @@ def plot_f_importances(coef, names):
 def adjust_predictions(y, digitize, sigmoidal_tf):
     if digitize:
         n_quantiles = 11
-        plt.hist(y, bins=30, edgecolor='k')
-        plt.title("Histogram before applying digitization")
-        plt.show()
+        # plt.hist(y, bins=20, edgecolor='k')
+        # plt.title("Histogram before applying digitization")
+        # plt.show()
         quantiles = np.linspace(0, 1, n_quantiles)
         y = np.digitize(y, np.nanquantile(y, quantiles))
-        plt.hist(y, edgecolor='k')
-        plt.title("Histogram after applying digitization")
-        plt.xticks(range(n_quantiles), [f' {i + 1}' for i in range(n_quantiles)])
-        plt.show()
+        # plt.hist(y, bins=20, edgecolor='k')
+        # plt.title("Histogram after applying digitization")
+        # plt.xticks(range(n_quantiles), [f' {i + 1}' for i in range(n_quantiles)])
+        # plt.show()
     elif sigmoidal_tf:
-        plt.hist(y, bins=30, edgecolor='k')
-        plt.title("Histogram before applying \n sigmoid transformation")
-        plt.show()
+        # plt.hist(y, bins=20, edgecolor='k')
+        # plt.title("Histogram before applying \n sigmoid transformation")
+        # plt.show()
         sigmoid = lambda x: 1 / (1 + np.exp(-.5 * (x - .5)))
         y = sigmoid(y)
-        plt.hist(y, edgecolor='k')
-        plt.title("Histogram after applying \n sigmoid transformation")
-        plt.show()
+        # plt.hist(y, bins=20, edgecolor='k')
+        # plt.title("Histogram after applying \n sigmoid transformation")
+        # plt.show()
+    else:
+        # plt.hist(y, bins=20, edgecolor='k')
+        # plt.title("Histogram before applying \n sqrt transformation")
+        # plt.show()
+        y = np.sqrt(y)
+        # plt.hist(y, bins=20, edgecolor='k')
+        # plt.title("Histogram after applying \n sqrt transformation")
+        # plt.show()
     return y
 
 
@@ -142,5 +150,5 @@ def plot_colorbar():
 def plot_loss(loss):
     plt.plot(loss)
     plt.xlabel("Iterations")
-    _ = plt.ylabel("Loss")
+    plt.ylabel("Loss")
     plt.show()

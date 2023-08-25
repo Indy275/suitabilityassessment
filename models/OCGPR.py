@@ -12,9 +12,11 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
+import os
 
 config = configparser.ConfigParser()
-config.read('config.ini')
+parent = os.path.dirname
+config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 
 fig_url = config['DEFAULT']['fig_url']
 plot_data = int(config['PLOTTING']['plot_data'])
@@ -263,7 +265,7 @@ def run_model(train_mod, test_mod):
 
     print(y_preds, y_preds.shape)
 
-    mse_text = ['', '', '','']
+    mse_text = ['', '', '', '']
     if test_mod in ['oc', 'ws']:  # performance quantification only possible if expert labels are available
         mse = evaluate(X_train, test_mod, ls, svar)
         mse_text = [f'\n MSE {mode:.3f}' for mode in mse]
@@ -271,7 +273,7 @@ def run_model(train_mod, test_mod):
     if plot_pred:
         titles = [r'mean $\mu_*$', r'neg. variance $-\sigma^2_*$', r'log. predictive probability $p(y=1|X,y,x_*)$',
                   r'log. moment ratio $\mu_*/\sigma_*$']
-        name = fig_url + test_mod + '_' + train_mod + '_ocgp_' + kernel
+        name = fig_url + '/' + test_mod + '_' + train_mod + '_ocgp_' + kernel
         for i in range(len(titles)):
             X1 = test_lnglat[:, 0]
             X2 = test_lnglat[:, 1]

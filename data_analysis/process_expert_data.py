@@ -42,7 +42,8 @@ def process_experts_indiv(data):
                 datapoints.append(point)
             cr = ahp_util.compute_consistency_ratio(np.squeeze(matrix))
             crs.append(cr)
-            print(f'Expert evaluated {points} with weights: {expertweights} (CR: {cr})')
+            role = expert['Q1']
+            print(f'Expert {role} evaluated {points} with weights: {expertweights} (CR: {cr})')
     print("consistencyratios",crs)
     return datapoints, weights_dp
 

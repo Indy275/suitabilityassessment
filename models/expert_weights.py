@@ -37,8 +37,8 @@ def run_model(mod):
 
     start_time = time.time()
     weights = pd.read_csv(data_url + f'/factorweights_{cluster.upper()}.csv')
-    weights = list(weights['Median'])
-    weights = [w/max(weights) for w in weights]
+    weights = list(weights['IQR'])
+    weights = [w/max(weights) for w in weights] * -1
     data = data_loader.DataLoader(mod, ref_std='testdata')
     unweighted_df, nans, lnglat, size, col_names = data.preprocess_input()
     if coords_as_features:

@@ -1,6 +1,7 @@
 import configparser
 import numpy as np
 import pandas as pd
+import os
 from sklearn.metrics import mean_squared_error
 
 from data_util import data_loader
@@ -17,18 +18,19 @@ from gpytorch.distributions import MultivariateNormal
 import matplotlib.pyplot as plt
 
 config = configparser.ConfigParser()
-config.read('config.ini')
-
+parent = os.path.dirname
+config.read(os.path.join(parent(parent(__file__)), 'config.ini'))
 data_url = config['DEFAULT']['data_url']
 fig_url = config['DEFAULT']['fig_url']
 plot_data = int(config['PLOTTING']['plot_data'])
 plot_pred = int(config['PLOTTING']['plot_prediction'])
+plot_features = int(config['PLOTTING']['plot_features'])
+plot_loss = int(config['PLOTTING']['plot_loss'])
 plot_feature_importance = int(config['PLOTTING']['plot_feature_importance'])
 plot_variance = int(config['PLOTTING']['plot_variance'])
 digitize = int(config['PLOTTING']['digitize_prediction'])
 sigmoidal_tf = int(config['PLOTTING']['sigmoid_prediction'])
 coords_as_features = config.getboolean('DATA_SETTINGS', 'coords_as_features')
-plot_features = int(config['PLOTTING']['plot_features'])
 
 
 def save_imp(imp, names, model, modifier):
@@ -123,9 +125,10 @@ def trainlnglat(train_x, train_y, kernel1, kernel2, num_steps=500, lr=0.01, lass
             ls_coord = model.covar_module_coord.base_kernel.lengthscale.detach().numpy()
             ls_feat = model.covar_module_feat.base_kernel.lengthscale.detach().numpy()
         ls = [y for x in [ls_coord[0], ls_feat[0]] for y in x]
-    else:
+    else:  # linear kernel does not have length scale parameter
         ls = []
 
+    losses = torch.stack(losses).detach().numpy()
     return model, likelihood, losses, ls
 
 
@@ -168,6 +171,7 @@ def train(train_x, train_y, kernel1, num_steps=500, lr=0.01, lasso=1e-4):
             ls = model.covar_module.base_kernel.lengthscale.detach().numpy()[0]
     else:
         ls = []
+    losses = torch.stack(losses).detach().numpy()
 
     return model, likelihood, losses, ls
 
@@ -178,6 +182,7 @@ def predict(LngLat, X_test, test_nans, model, likelihood):
     y_preds[:, 1] = LngLat[:, 1]  # test latitude
     y_preds[test_nans, 2] = np.nan  # mean
     y_preds[test_nans, 3] = np.nan  # var
+    y_preds[test_nans, 1]= np.nan
 
     X_test = X_test[~test_nans]
 
@@ -189,12 +194,24 @@ def predict(LngLat, X_test, test_nans, model, likelihood):
 
     f_mean = f_preds.mean
     f_var = f_preds.variance
-    # f_covar = f_preds.covariance_matrix
+    f_covar = f_preds.covariance_matrix
     y_mean = y_pred.mean
+    y_var = y_pred.variance
+
+    print(f_mean.shape, f_var.shape, f_covar.shape, y_mean.shape, y_var.shape)
+    print(f_mean[0], f_var[0], f_covar[0][0], y_mean[0], y_var[0])
+
+    print("confreg",y_pred.confidence_region())
+
+    print("mean var", torch.mean(y_var), "std:", torch.sqrt(torch.mean(y_var)))
 
     with torch.no_grad():
         y_preds[~test_nans, 2] = y_mean.numpy()
-        y_preds[~test_nans, 3] = f_var.numpy()
+        # y_preds[~test_nans, 3] = y_var.numpy()
+        # y_preds[~test_nans, 3] = y_pred.confidence_region()
+        lower, upper = y_pred.confidence_region()
+        y_preds[~test_nans, 3] = lower
+        y_preds[~test_nans, 1] = upper
 
     return y_preds
 
@@ -213,9 +230,9 @@ def evaluate(test_mod, model, likelihood, test_indices):
 
 def plot_feature(data_loader, model, likelihood, ind):
     x_train, y_train, lnglat, col_names = data_loader.preprocess_input()
-    orig_df = np.array(data_loader.load_orig_df())[:, ind]
-    x_train = x_train[:, ind]
     col_names = np.array(col_names)[ind]
+    ind = [i+2 for i in ind]
+    orig_df = np.array(data_loader.load_orig_df())[:, ind]
 
     n_samples = 200
 
@@ -238,7 +255,9 @@ def plot_feature(data_loader, model, likelihood, ind):
         y_pred = predict(lnglat, x_eval, test_nans.T, model, likelihood)
         plt.scatter(orig_df[:, feature], y_train, marker='x')
         plt.plot(x_orig, y_pred[:, 2], color='orange')
-        plt.fill_between(x_orig, y_pred[:, 2] - y_pred[:, 3], y_pred[:, 2] + y_pred[:, 3], alpha=0.5)
+        # plt.fill_between(x_orig, y_pred[:, 2] - y_pred[:, 3], y_pred[:, 2] + y_pred[:, 3], alpha=0.5)
+        plt.fill_between(x_orig, y_pred[:, 3], y_pred[:, 1], alpha=0.5)
+
         plt.xlabel(col_names[feature])
         plt.ylabel("Suitability score")
         plt.show()
@@ -324,6 +343,9 @@ def run_model(train_mod, test_mod):
             f_imp = np.array(f_imp) / np.sum(f_imp)  # normalize length scales
             plot.plot_f_importances(f_imp, train_col_names)
             save_imp(f_imp, train_col_names, k_name, test_mod)
+
+        if plot_loss:
+            plot.plot_loss(losses)
 
         if test_mod.startswith(('ws', 'oc')):  # test labels exist only for these data sets
             evaluate(test_mod, model, likelihood, x_indices)

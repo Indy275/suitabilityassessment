@@ -7,20 +7,8 @@ from textwrap import wrap
 
 from data_util import data_loader
 
-def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=256 ):
-    """ mycolormap = truncate_colormap(
-            cmap name or file or ndarray,
-            minval=0.2, maxval=0.8 ): subset
-            minval=1, maxval=0 )    : reverse
-    by unutbu http://stackoverflow.com/questions/18926031/how-to-extract-a-subset-of-a-colormap-as-a-new-colormap-in-matplotlib
-    """
-    cmap = plt.get_cmap(cmap)
-    name = "%s-trunc-%.2g-%.2g" % (cmap.name, minval, maxval)
-    return colors.LinearSegmentedColormap.from_list(
-        name, cmap( np.linspace( minval, maxval, n )))
-
-
-X, col_names = data_loader.load_x('noordholland')
+loader = data_loader.DataLoader('noordholland', ref_std='testdata')
+X, nans, lnglat, size, col_names = loader.preprocess_input()
 
 # fig = plt.figure()
 # ax = fig.add_subplot(projection='3d')
@@ -47,19 +35,30 @@ X = range(0, data.shape[0])
 Y = range(0, data.shape[0])
 xs, ys = np.meshgrid(X, Y)
 
-zs1 = data[:,:,2]
-zs2 = data[:,:,3]
-zs3 = data[:,:,4]
-zs4 = data[:,:,5]
-zs5 = data[:,:,6]
+zs1 = data[:, :, 0]
+zs2 = data[:, :, 1]
+zs3 = data[:, :, 2]
+zs4 = data[:, :, 3]
+zs5 = data[:, :, 4]
+z = np.zeros(zs1.shape)
 
 fig = plt.figure()
 ax2 = fig.add_subplot(projection='3d')
-plot = ax2.plot_surface(np.flip(xs), ys, zs1,  cmap='YlOrBr')
-plot = ax2.plot_surface(np.flip(xs), ys, zs2 + 1500, cmap='Blues')
-plot = ax2.plot_surface(np.flip(xs), ys, zs3 + 3000,  cmap='YlOrBr')
-plot = ax2.plot_surface(np.flip(xs), ys, zs4 + 4500, cmap='Blues')
-plot = ax2.plot_surface(np.flip(xs), ys, zs5 + 6000, cmap='Blues')
+ax2.plot_surface(np.flip(xs), ys, zs5 + 100, shade=False, cmap='YlOrBr', alpha=1.0)
+ax2.plot_surface(np.flip(xs), ys, z, color='#78bced', shade=False, alpha=0.6)
+
+ax2.plot_surface(np.flip(xs), ys, zs4 + 1500, shade=False, cmap='Blues', alpha=1.0)
+ax2.plot_surface(np.flip(xs), ys, z + 1400, color='#78bced', shade=False, alpha=0.6)
+
+ax2.plot_surface(np.flip(xs), ys, zs3 + 3000, shade=False, cmap='YlOrBr', alpha=1.0)
+ax2.plot_surface(np.flip(xs), ys, z + 2900, color='#78bced', shade=False, alpha=0.6)
+
+ax2.plot_surface(np.flip(xs), ys, zs2 + 4500, shade=False, cmap='Blues', alpha=1.0)
+ax2.plot_surface(np.flip(xs), ys, z + 4400, color='#78bced', shade=False, alpha=0.6)
+
+ax2.plot_surface(np.flip(xs), ys, zs1 + 6000, shade=False, cmap='Blues', alpha=1.0)
+ax2.plot_surface(np.flip(xs), ys, z + 5900, color='#78bced', shade=False, alpha=0.6)
+
 ax2.set_zticks([0, 1500, 3000, 4500, 6000])
 ax2.set_zticklabels(labels[::-1])
 

@@ -10,7 +10,7 @@ data_url = config['DEFAULT']['data_url']
 
 
 def geo_mean(iterable):
-    a = np.array(iterable)
+    a = np.array(iterable).astype(float)
     return (a+1).prod() ** (1.0 / len(a)) - 1
 
 
@@ -73,7 +73,6 @@ def compute_consistency_ratio(matrix):
     n = len(matrix)
     lambda_max = np.max(np.linalg.eigvals(matrix))
     consistency_index = (lambda_max - n) / (n - 1)
-    print("lambdamax , n",lambda_max, n)
 
     ri_dict = {3: 0.52, 4: 0.89, 5: 1.11, 6: 1.25, 7: 1.35, 8: 1.40, 9: 1.45,
                10: 1.49, 11: 1.52, 12: 1.54, 13: 1.56, 14: 1.58, 15: 1.59}
