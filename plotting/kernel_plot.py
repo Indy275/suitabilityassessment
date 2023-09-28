@@ -26,7 +26,7 @@ def plot_prior_samples(gpr_model, n_samples, ax, label):
 
     # y_mean, y_std = gpr_model.predict(X, return_std=True)
     y_samples = gpr_model.sample_y(X, n_samples)
-
+    print(x.shape, y_samples.shape)
     for idx, single_prior in enumerate(y_samples.T):
         ax.plot(
             x,

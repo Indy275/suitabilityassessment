@@ -220,7 +220,7 @@ def get_fav_data(modifier, ref_std, bbox, size, test):
 
 def get_expert_data(modifier):
     expert_scores = pd.read_csv(data_url + f'/expertscores_{modifier.lower()}.csv', header=[0])
-    exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier), header=[0])
+    exp_point_info = pd.read_csv(data_url + '/expert_point_info_{}.csv'.format(modifier[:2]), header=[0])
     point_info_scores = expert_scores.merge(exp_point_info, on='Point', how='left',
                                             suffixes=('', '_DROP')).filter(regex='^(?!.*_DROP)')
     y = point_info_scores['Value'].to_numpy()

@@ -37,8 +37,10 @@ def run_model(mod):
 
     start_time = time.time()
     weights = pd.read_csv(data_url + f'/factorweights_{cluster.upper()}.csv')
-    weights = list(weights['IQR'])
-    weights = [w/max(weights) for w in weights] * -1
+    weights = list(weights['Median'])
+    weights = [w/max(weights) for w in weights]
+    print(weights)
+    # weights = [1] * 5
     data = data_loader.DataLoader(mod, ref_std='testdata')
     unweighted_df, nans, lnglat, size, col_names = data.preprocess_input()
     if coords_as_features:
@@ -58,7 +60,7 @@ def run_model(mod):
     if digitize: fig_name += '_dig'
     if sigmoidal_tf: fig_name += '_sig'
     print(f'Plot took {time.time() - start_time} seconds to create {fig_name} map')
-    fig_title = 'Suitability map of Noord Holland'
+    fig_title = 'Suitability map'
     if mod in ['ws', 'oc']:  # plot train labels on top of prediction
         loader = data_loader.DataLoader(mod, ref_std='expert_ref')
         train_labs = np.column_stack([loader.lnglat[:, 0], loader.lnglat[:, 1], loader.y])

@@ -25,6 +25,7 @@ def plot_y(loader, bg, ref_std):
 
     if ref_std == 'hist_buildings':
         s = ax.scatter(lnglat[:, 0], lnglat[:, 1], s=1, c='r')
+        ax.set_title(f'Locations of {len(lnglat[:, 0])} historical buildings')
     elif ref_std == 'expert_ref':
         cmap = plotting.plot.set_colmap()
         points = [Point(x1, x2) for x1, x2 in loader.lnglat[:, :2]]
@@ -36,6 +37,7 @@ def plot_y(loader, bg, ref_std):
         df = df.merge(df_mean, on=['X1', 'X2'], how='left')
         df.sort_values(['y_mean'], inplace=True)
         s = ax.scatter(df['X1'], df['X2'], c=df['y_mean'], cmap=cmap, s=df['Count'] * 25 + 25, edgecolors='black')
+        fig.colorbar(s)
 
         # if len(df) == 5:  # We're evaluating OC labels
         #     labs = [r'$\alpha$', r'$\beta$', r'$\gamma$', r'$\delta$', r'$\epsilon$']
@@ -54,7 +56,8 @@ def plot_y(loader, bg, ref_std):
         # ax.scatter(df['X1'], df['X2'], c='r', marker=df['sym'], edgecolors='black')
 
     # ax.set_title("Geometric mean score per data point")
-    fig.colorbar(s)
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
     plt.tight_layout()
 
     plt.show()

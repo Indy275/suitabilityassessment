@@ -5,6 +5,7 @@ import numpy as np
 import os
 from joblib import load
 from data_util import data_loader
+import seaborn as sns
 
 config = configparser.ConfigParser()
 parent = os.path.dirname
@@ -23,6 +24,17 @@ X_test, test_nans, test_lnglat, test_size, test_col_names = test_data.preprocess
 
 df1_orig = train_data.load_orig_df()
 df2_orig = test_data.load_orig_df()
+
+def plot_correlation():
+    dfcols = ['Primair', 'Regionaal', 'Bodemdaling', 'Inundatie', 'Bodemberging']
+    # sns.pairplot(pd.DataFrame(X_test, columns=test_col_names))
+    df = pd.DataFrame(X_test, columns=test_col_names)
+    plt.matshow(df.corr())
+    plt.xticks(range(df.shape[1]), dfcols, fontsize=8, rotation=10)
+    plt.yticks(range(df.shape[1]), dfcols, fontsize=8, rotation=80)
+    cb = plt.colorbar()
+    cb.ax.tick_params(labelsize=14)
+    plt.title('Correlation Matrix', fontsize=16);plt.show()
 
 # plt.hist(df1_orig[:, 0])
 # plt.show()

@@ -39,12 +39,18 @@ def train(X_train, y_train, model):
         predictor1.fit(X_train, y_train)
         feature_imp = predictor1.feature_importances_
         print(feature_imp, "gbr")
-        predictor = SVR(kernel='linear')
-        predictor.fit(X_train, y_train)
         results = permutation_importance(predictor1, X_train, y_train, scoring='neg_mean_squared_error', n_repeats=10)
         importance = results.importances_mean
-        for i, v in enumerate(importance):
-            print('Feature: %0d, Score: %.5f' % (i, v))
+        sumimp = sum(importance)
+        print(importance / sumimp, "GBR2")
+        predictor = SVR(kernel='linear')
+        predictor.fit(X_train, y_train)
+        results = permutation_importance(predictor, X_train, y_train, scoring='neg_mean_squared_error', n_repeats=10)
+        importance = results.importances_mean
+        sumimp = sum(importance)
+        feature_imp = importance
+
+        print(importance / sumimp, "SVR")
 
     elif model == 'svm':
         kernel = 'linear'  # 'linear'  'rbf'
@@ -88,9 +94,10 @@ def evaluate(test_mod, predictor, test_indices):
     x_eval, y_eval, eval_lnglat, test_col_names = eval_loader.preprocess_input()
     eval_nans = np.isnan(x_eval).any(axis=1)
     x_eval = x_eval[:, test_indices]
-
+    print(x_eval)
     y_pred = predict(eval_lnglat, x_eval, eval_nans, model='gbr', predictor=predictor)
-    mse = mean_squared_error(y_eval, y_pred[:, -2])
+    print(y_pred[:, -1], y_eval)
+    mse = mean_squared_error(y_eval, y_pred[:, -1])
     print("Test MSE: {:.4f}".format(mse))
 
 

@@ -31,8 +31,8 @@ def set_cluster(cluster):
     return data_link, start_date
 
 
-cluster = 'ws'
-data_link, start_date= set_cluster(cluster)
+cluster = 'agg'
+data_link, start_date = set_cluster(cluster)
 
 data = ahp_util.read_survey_data(data_link, start_date)
 data.dropna(subset=['Q1'], inplace=True)  # Drop all reports in which question was not answered
@@ -41,6 +41,8 @@ for col in ['Q2_5', 'Q2_4', 'Q2_3', 'Q2_2', 'Q2_1']:
     data[col] = pd.to_numeric(data[col])
     data[col] = np.where(data[col] == 1, 0, data[col])  # 'Niet belangrijk' encoded as value 1
     data[col] = np.where(data[col] == 6, 1, data[col])  # Qualtrics error: 'Een beetje belangrijk' received value 6
+
+print(len(data))
 
 arit_means, geom_means, medians, stds, iqrs = [], [], [], [], []
 for col in ['Q2_1', 'Q2_2', 'Q2_3', 'Q2_4', 'Q2_5']:

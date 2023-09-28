@@ -182,8 +182,7 @@ def predict(LngLat, X_test, test_nans, model, likelihood):
     y_preds[:, 1] = LngLat[:, 1]  # test latitude
     y_preds[test_nans, 2] = np.nan  # mean
     y_preds[test_nans, 3] = np.nan  # var
-    y_preds[test_nans, 1]= np.nan
-
+    # y_preds[test_nans, 1] = np.nan
     X_test = X_test[~test_nans]
 
     # test phase
@@ -191,27 +190,26 @@ def predict(LngLat, X_test, test_nans, model, likelihood):
     likelihood.eval()
     f_preds = model(X_test)
     y_pred = likelihood(model(X_test))
-
     f_mean = f_preds.mean
     f_var = f_preds.variance
-    f_covar = f_preds.covariance_matrix
+    # f_covar = f_preds.covariance_matrix
     y_mean = y_pred.mean
     y_var = y_pred.variance
 
-    print(f_mean.shape, f_var.shape, f_covar.shape, y_mean.shape, y_var.shape)
-    print(f_mean[0], f_var[0], f_covar[0][0], y_mean[0], y_var[0])
+    # print(f_mean.shape, f_var.shape, f_covar.shape, y_mean.shape, y_var.shape)
+    # print(f_mean[0], f_var[0], f_covar[0][0], y_mean[0], y_var[0])
 
-    print("confreg",y_pred.confidence_region())
+    # print("confreg",y_pred.confidence_region())
 
-    print("mean var", torch.mean(y_var), "std:", torch.sqrt(torch.mean(y_var)))
+    # print("mean var", torch.mean(y_var), "std:", torch.sqrt(torch.mean(y_var)))
 
     with torch.no_grad():
         y_preds[~test_nans, 2] = y_mean.numpy()
         # y_preds[~test_nans, 3] = y_var.numpy()
         # y_preds[~test_nans, 3] = y_pred.confidence_region()
         lower, upper = y_pred.confidence_region()
-        y_preds[~test_nans, 3] = lower
-        y_preds[~test_nans, 1] = upper
+        # y_preds[~test_nans, 3] = lower
+        # y_preds[~test_nans, 1] = upper
 
     return y_preds
 
@@ -315,7 +313,7 @@ def run_model(train_mod, test_mod):
             model, likelihood, losses, ls = train(X_train_tensor, y_train_tensor, feature_kernel,
                                                   num_steps=num_steps, lr=lr, lasso=lasso)
         y_preds = predict(test_lnglat, X_test_tensor, test_nans, model, likelihood)
-
+        print(test_nans.shape, sum(test_nans), test_lnglat)
         y_preds[~test_nans, 2] = plot.adjust_predictions(y_preds[~test_nans, 2], digitize=digitize, sigmoidal_tf=sigmoidal_tf)
 
         if plot_pred:
@@ -325,6 +323,7 @@ def run_model(train_mod, test_mod):
 
             if train_mod[:2] == test_mod[:2]:  # plot train labels on top of prediction
                 train_labs = np.column_stack([train_lnglat[:, 0], train_lnglat[:, 1], y_train])
+            print(y_preds.shape, min(y_preds[:, 0]), min(y_preds[:, 1]), min(y_preds[:, 2]))
             plot.plot_prediction(y_preds, test_size, fig_name, title=fig_title, train_labs=train_labs, contour=contour, bg=bg_test, savefig=True)
 
         if plot_variance:

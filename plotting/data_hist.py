@@ -39,3 +39,5 @@ for i, column in enumerate(df.columns): #[2:]
     plt.ylabel('Count')
     plt.ylim([0, 500])
     plt.show()
+
+

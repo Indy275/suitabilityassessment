@@ -48,6 +48,7 @@ def plot_f_importances(coef, names):
 
 
 def adjust_predictions(y, digitize, sigmoidal_tf):
+    sqrt_tf = False
     if digitize:
         n_quantiles = 11
         # plt.hist(y, bins=20, edgecolor='k')
@@ -68,7 +69,7 @@ def adjust_predictions(y, digitize, sigmoidal_tf):
         # plt.hist(y, bins=20, edgecolor='k')
         # plt.title("Histogram after applying \n sigmoid transformation")
         # plt.show()
-    else:
+    elif sqrt_tf:
         # plt.hist(y, bins=20, edgecolor='k')
         # plt.title("Histogram before applying \n sqrt transformation")
         # plt.show()
@@ -97,7 +98,7 @@ def plot_prediction(y_preds, test_size, fig_name=None, title='', train_labs=None
                extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)])
     if not contour:
         plt.imshow(y_preds[:, 2].reshape((test_size, test_size)), alpha=0.65, cmap=cmap,
-                   extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)], aspect=ratio)
+                   extent=[np.nanmin(X1), np.nanmax(X1), np.nanmin(X2), np.nanmax(X2)])
     else:
         plt.contourf(X1[:test_size], X2[::test_size], y_preds[:, 2].reshape((test_size, test_size)),
                      cmap=cmap, origin='upper', alpha=0.65)

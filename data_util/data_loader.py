@@ -34,20 +34,6 @@ class DataLoader:
         self.lnglat = df_orig[:, :2]
         return df_orig
 
-    # def denormalize(self, data):
-    #     ss = load(data_url + '/' + self.modifier + "/" + self.ref_std + "_scaler.joblib")
-    #     print(data.shape, self.X_orig.shape)
-    #     if data.shape[-1] != self.X_orig.shape[-1]:  # data misses the coordinates, add coordinate data
-    #         data = np.column_stack((self.lnglat, self.X))
-    #     print(data.shape, self.X_orig.shape)
-    #
-    #     data = self.X_orig[~self.nans]
-    #
-    #     data = ss.inverse_transform(data)
-    #     data = data[~self.nans]
-    #
-    #     return data
-
     def load_data(self):
         df = pd.read_csv(data_url + '/' + self.modifier + '/' + self.ref_std + '.csv')
         col_names = list(df.columns)

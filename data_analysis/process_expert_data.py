@@ -44,7 +44,7 @@ def process_experts_indiv(data):
             crs.append(cr)
             role = expert['Q1']
             print(f'Expert {role} evaluated {points} with weights: {expertweights} (CR: {cr})')
-    print("consistencyratios",crs)
+    print(f"CR: min:{min(crs)} mean: {np.mean(crs)} max: {max(crs)}")
     return datapoints, weights_dp
 
 
